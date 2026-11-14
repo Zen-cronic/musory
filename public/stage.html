@@ -45,7 +45,7 @@
   </section>
   <section class="right">
     <div class="top"><span class="wordmark lg">Musory</span><h2 class="display" id="venue-name" style="font-size:5vh"></h2></div>
-    <div class="sim controls"><button id="simulate" class="btn forget go">Simulated guests: 5 tap a new sound</button><button id="audience" class="btn" aria-pressed="false">Audience mode: off</button><button id="their-turn" class="btn" hidden>Their turn: next typed vibe makes a track</button><button id="reset" class="btn reset" title="Reset both rooms">Reset</button></div>
+    <div class="sim controls"><span class="note">Simulated guests:</span><button id="simulate" class="btn forget go" data-count="5">5</button><button id="simulate-20" class="btn forget go" data-count="20">20</button><button id="simulate-100" class="btn forget go" data-count="100">100</button><button id="audience" class="btn" aria-pressed="false">Audience mode: off</button><button id="their-turn" class="btn" hidden>Their turn: next typed vibe makes a track</button><button id="reset" class="btn reset" title="Reset both rooms">Reset</button></div>
     <div class="count"><span class="figure n" id="present" data-testid="stage-count">0</span><span class="l">people shaping the music</span></div>
     <div class="slab now" data-testid="now-playing" id="now-playing" data-track-id=""><span class="kicker">Now playing</span><span class="display t" id="now-title"></span><span class="g" id="now-meta"></span></div>
   </section>
@@ -89,6 +89,12 @@ const showAudience = (st) => {
 fetch("/api/stage/audience").then((r) => r.json()).then(showAudience).catch(() => {});
 $("audience").onclick = async () => showAudience(await api("/api/stage/audience", { on: $("audience").getAttribute("aria-pressed") !== "true" }));
 $("their-turn").onclick = async () => showAudience(await api("/api/stage/their-turn", { venueId: venue }));
+for (const id of ["simulate-20", "simulate-100"]) $(id).onclick = () => simulateCount(Number($(id).dataset.count), id);
+async function simulateCount(count, id) {
+  $(id).disabled = true;
+  try { await api("/api/stage/simulate", { venueId: venue, count }); } catch { /* the room shows what happened */ }
+  setTimeout(() => ($(id).disabled = false), 1500);
+}
 $("simulate").onclick = async () => {
   $("simulate").disabled = true;
   try { await api("/api/stage/simulate", { venueId: venue }); } catch { /* the room shows what happened */ }

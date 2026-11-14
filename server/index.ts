@@ -201,7 +201,7 @@ app.post("/api/stage/their-turn", wrap(async (req) => markTheirTurn(venueOf(req.
 app.get("/api/stage/audience", (_req, res) => res.json(audienceState()));
 app.post("/api/stage/music-pause", wrap(async (req) => pauseMusic(Number(req.body?.seconds ?? 90))));
 app.post("/api/stage/clear-load", wrap(async () => clearLoadGuests()));
-app.post("/api/stage/simulate", wrap(async (req) => simulateGuests(venueOf(req.body?.venueId ?? "copper"), req.body?.genre ? String(req.body.genre) : undefined)));
+app.post("/api/stage/simulate", wrap(async (req) => simulateGuests(venueOf(req.body?.venueId ?? "copper"), req.body?.genre ? String(req.body.genre) : undefined, Number(req.body?.count ?? 5))));
 let ready = false; // true once tracks are loaded, change streams are on and the rooms are playing
 // Every sound the rooms play is read from Atlas. Catalogue tracks (shared, nothing personal) may be cached;
 // a track made for a room is never cached and is gone (404) once forget me or closing time deletes its record.

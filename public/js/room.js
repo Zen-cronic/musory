@@ -374,7 +374,8 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !drawer.
 $("skip").onclick = () => api(`/api/room/${venue}/skip`, {});
 $("next-hour").onclick = () => api("/api/clock/next", {});
 $("read-other").onclick = () => api(`/api/room/${venue}/read-other`, {}).catch(() => {});
-$("simulate").onclick = () => api("/api/stage/simulate", { venueId: venue }).then((r) => feed(`Simulated guests: ${r.guests} tapped ${genreName(r.genre).toLowerCase()}`)).catch(() => {});
+for (const id of ["simulate", "simulate-20", "simulate-100"])
+  $(id).onclick = () => api("/api/stage/simulate", { venueId: venue, count: Number($(id).dataset.count) }).then((r) => feed(`Simulated guests: ${r.guests} tapped ${genreName(r.genre).toLowerCase()}`)).catch(() => {});
 $("compose").onclick = async () => {
   $("compose").disabled = true;
   try { await api(`/api/room/${venue}/generate`, {}); } catch { /* the fallback event explains */ }

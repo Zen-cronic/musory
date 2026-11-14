@@ -1311,14 +1311,41 @@ async function checkinQuiet(personId: string, venueId: VenueId) {
  * "I like this" on two short samples of one sound. Deterministic: same guests, same samples, same order.
  * Default sound: disco if the room is playing something hard (techno, trance, drum & bass), otherwise techno.
  */
-export async function simulateGuests(venueId: VenueId, genre?: string) {
+export async function simulateGuests(venueId: VenueId, genre?: string, count = 5) {
+  const n = [5, 20, 100].includes(count) ? count : 5;
   const hard = ["techno", "trance", "drum & bass"].includes(currentGenre(venueId));
   const target = genre && GENRES.includes(genre) ? genre : hard ? "disco" : "techno";
   const samples = CATALOG.filter((t) => t.genre === target).slice(0, 2).map((t) => t._id);
   const d = await db();
-  const ids = [1, 2, 3, 4, 5].map((i) => `sim-${i}`);
+  const ids = Array.from({ length: n }, (_, i) => `sim-${i + 1}`);
   // Each simulated guest starts fresh for this sound: earlier simulated taps are cleared first.
-  await Promise.all([d.collection(TAPS).deleteMany({ personId: { $in: ids } }), ...ids.map((id) => checkinQuiet(id, venueId))]);
+  // Check-ins are written in bulk, so 100 guests take a few round trips, not hundreds.
+  const t = new Date();
+  await Promise.all([
+    d.collection(TAPS).deleteMany({ personId: { $in: ids } }),
+    d.collection(PRESENCE).deleteMany({ personId: { $in: ids }, venueId: { $ne: venueId } }),
+    d.collection(CONSENTS).bulkWrite(
+      ids.map((personId) => ({
+        updateOne: {
+          filter: { personId, venueId },
+          update: { $set: { scopes: ["use_taste", "contribute_crowd"], grantedAt: t, expiresAt: new Date(t.getTime() + 8 * 3600_000) } },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    ),
+  ]);
+  await d.collection(PRESENCE).bulkWrite(
+    ids.map((personId) => ({
+      updateOne: {
+        filter: { _id: `${venueId}|${personId}` as never },
+        update: { $set: { personId, venueId, since: new Date(t.getTime() - 10 * 60_000), expiresAt: new Date(t.getTime() + 3 * 3600_000) } },
+        upsert: true,
+      },
+    })),
+    { ordered: false },
+  );
+  void emitPresence(venueId);
   const consents = await d.collection(CONSENTS).find({ personId: { $in: ids }, venueId }).toArray();
   const now = Date.now();
   const docs = ids.flatMap((id, i) =>
