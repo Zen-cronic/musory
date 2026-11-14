@@ -53,7 +53,7 @@ const n = await api("/api/number").catch(() => null);
 const bits = [];
 if (n?.picksChangedByMemory) bits.push(`Tonight the people here changed ${n.picksChangedByMemory} of ${n.picks} picks.`);
 if (n?.forgotten) bits.push(`${n.forgotten} ${n.forgotten === 1 ? "guest" : "guests"} said forget me, and ${n.recordsLeftForForgottenGuests ? n.recordsLeftForForgottenGuests + " records" : "no records"} about them are left.`);
-$("number").textContent = bits.join(" ");
+$("number").textContent = bits.length ? (n.includesSimulated ? "Including simulated guests. " : "") + bits.join(" ") : "";
 </script>
 </body>
 </html>
