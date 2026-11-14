@@ -1,6 +1,6 @@
 import { api, events, $, bars, progress, refusalTicket } from "/js/common.js";
 
-const venue = location.pathname.split("/")[2];
+const venue = location.pathname.split("/")[2] || new URLSearchParams(location.search).get("venue") || "copper";
 const params = new URLSearchParams(location.search);
 const film = params.get("film") === "1";
 // Transitions: 1 s crossfade between catalogue tracks; 3 s crossfade with filter sweeps into or out of a

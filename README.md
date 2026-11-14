@@ -47,6 +47,12 @@ Other rules the database enforces (`validationLevel: "constraint"`, error 121 ot
 - One reaction per guest per track (unique index, E11000).
 - Taps live at most 180 days (TTL index); check-ins and tonight-only sessions expire too.
 
+## How fast it is (measured on the Atlas sandbox, 2026-11-14)
+
+- A guest checks in and their taste changes the room: the room plays a track made for it about 4 seconds later (ElevenLabs takes about 2.5 seconds of that).
+- Five simulated guests tap a new sound: a new track made for the room is playing about 6 seconds later.
+- Forget me: the room crossfades to the track it promised without the guest about 2.3 seconds after the request, and the full receipt arrives about a second later, once the pick has been recomputed from what is left in the database. With the durable forget job on, add about 1.5 seconds.
+
 ## How forget me reaches every copy
 
 Crowd memory holds no identities, so how does forget me find your share? Each crowd memory document lists the tap ids it was built from (`derivedFrom`), and taps belong to the guest. Forget me starts at your taps and runs `$graphLookup` over `derivedFrom`: depth 0 finds your taste and every venue's crowd memory you fed; depth 1 finds the decisions built from those. In one transaction it deletes your taps, taste, check-ins, consents, tonight sessions and bored records, rebuilds each crowd memory from the taps that remain (removing it if fewer than 3 people are left), unlinks your taste from past decisions, and writes a text-free receipt (an HMAC of your id plus counts). Then both rooms re-pick and play the new pick at once.

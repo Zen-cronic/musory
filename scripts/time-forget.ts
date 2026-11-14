@@ -35,5 +35,5 @@ const tr = Date.now() - t0;
 await sleep(1500);
 ac.abort();
 const firstPlay = plays.find(([t, v]) => t >= t0 && v === "copper");
-console.log(`room changed at ${firstPlay ? firstPlay[0] - t0 : "never"} ms, receipt at ${tr} ms, ${r.totalBefore} -> ${r.totalAfter}, txn ${r.txnMs} ms, clips ${r.before?.composedClips}, job ${JSON.stringify(r.job ?? r.overheadMs ?? null).slice(0, 200)}`);
+console.log(`room changed at ${firstPlay ? firstPlay[0] - t0 : "never"} ms, receipt at ${tr} ms, ${r.totalBefore} -> ${r.totalAfter}, txn ${r.txnMs} ms, clips ${r.before?.composedClips}, timing ${JSON.stringify(r.timing ?? r.erased?.receipt?.timing ?? r)}`.slice(0, 600) + ``);
 process.exit(0);

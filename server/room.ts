@@ -848,34 +848,36 @@ async function forgetInner(personId: string) {
   const d = await db();
   const tStart = Date.now();
   const beforeP = countFor(personId);
-  // Each room's state the promise is made against: the track playing now and what it played recently.
-  const ctx: Partial<Record<VenueId, { nowTrack: string; exclude: string[] }>> = {};
-  await Promise.all(VENUE_IDS.map(async (v) => {
-    const nowTrack = catalogueId(rooms[v].play?.trackId ?? "t01");
-    const exclude = await recentlyPlayed(v);
-    if (!exclude.includes(nowTrack)) exclude.push(nowTrack);
-    ctx[v] = { nowTrack, exclude };
-  }));
-  // What each room would pick if this guest had never been here: computed before anything is deleted.
   const counterfactual: Partial<Record<VenueId, Candidate | null>> = {};
   const pickBefore: Partial<Record<VenueId, Candidate | null>> = {};
   const crowdBefore: Partial<Record<VenueId, number>> = {};
   const mixBefore: Partial<Record<VenueId, Record<string, number> | null>> = {};
   const mixAfter: Partial<Record<VenueId, Record<string, number> | null>> = {};
-  await Promise.all(
+  // Each room's state the promise is made against: the track playing now and what it played recently.
+  const ctx: Partial<Record<VenueId, { nowTrack: string; exclude: string[] }>> = {};
+  await Promise.all(VENUE_IDS.map(async (v) => {
+    const nowTrack = catalogueId(rooms[v].play?.trackId ?? "t01");
+    pickBefore[v] = (rooms[v].next?.picked as Candidate) ?? null;
+    const [exclude, crowd] = await Promise.all([
+      recentlyPlayed(v),
+      d.collection(DERIVED).findOne({ kind: "crowd", venueId: v }, { projection: { distinctContributors: 1, weights: 1 } }),
+    ]);
+    if (!exclude.includes(nowTrack)) exclude.push(nowTrack);
+    ctx[v] = { nowTrack, exclude };
+    crowdBefore[v] = (crowd?.distinctContributors as number) ?? 0;
+    mixBefore[v] = (crowd?.weights as Record<string, number>) ?? null;
+  }));
+  // What each room would pick if this guest had never been here: computed before anything is deleted.
+  // The pick without this guest leaves the guest out entirely, so it is the same whether it reads the data
+  // before or after the delete commits: it runs alongside the transaction.
+  const cfP = Promise.all(
     VENUE_IDS.map(async (v) => {
-      pickBefore[v] = (rooms[v].next?.picked as Candidate) ?? null;
-      const [crowd, cf] = await Promise.all([
-        d.collection(DERIVED).findOne({ kind: "crowd", venueId: v }, { projection: { distinctContributors: 1, weights: 1 } }),
-        computePick(v, { excludePerson: personId, ...ctx[v] }),
-      ]);
-      crowdBefore[v] = (crowd?.distinctContributors as number) ?? 0;
-      mixBefore[v] = (crowd?.weights as Record<string, number>) ?? null;
+      const cf = await computePick(v, { excludePerson: personId, ...ctx[v] });
       counterfactual[v] = cf.candidates[0] ?? null;
     }),
-  );
+  ).then(() => Date.now() - tStart);
   const before = await beforeP;
-  const cfMs = Date.now() - tStart;
+  let cfMs = 0;
   const c = await client("app");
   let graph: { depth0: number; depth1: number; venues: string[] } = { depth0: 0, depth1: 0, venues: [] };
   let clipIds: ObjectId[] = [];
@@ -939,6 +941,7 @@ async function forgetInner(personId: string) {
     }),
   );
   const txnMs = Date.now() - t0;
+  cfMs = await cfP;
   for (const id of clipIds) {
     const hex = id.toHexString();
     rmSync(path.join(GEN_DIR, `${hex}.mp3`), { force: true });
