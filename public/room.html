@@ -2,85 +2,168 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Musory · Room</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/base.css">
+<title>Musory</title>
+<script src="/js/look-early.js"></script>
+<link rel="stylesheet" href="/css/musory.css">
 <style>
-  body { padding: 24px; }
-  .grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; }
-  #venue-name { font-size: 56px; margin: 0 0 12px; }
-  #now-title { font-size: 64px; margin: 6px 0; }
-  #next-title { font-size: 32px; margin: 4px 0; }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-  #qr { width: 180px; height: 180px; background: var(--paper); }
-  #start-overlay { position: fixed; inset: 0; background: rgba(17,17,17,0.92); display: grid; place-items: center; z-index: 20; }
-  #receipt { position: fixed; inset: 10% 15%; z-index: 30; padding: 32px; }
-  #receipt .count { font-size: 120px; font-weight: 900; color: var(--band); font-family: var(--mono); }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } #now-title { font-size: 40px; } }
+  body { min-height: 100vh; }
+  .room { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; padding: 18px 22px 16px; gap: 14px; }
+  .head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .head .venue { font-size: calc(40px * var(--dscale)); }
+  .head .right { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+  .here { display: flex; align-items: baseline; gap: 8px; }
+  .here .n { font-size: 52px; }
+  .here span:last-child { font-weight: 700; }
+  .main { display: grid; grid-template-columns: 1fr 340px; gap: 14px; min-height: 0; }
+  .left { display: grid; grid-template-rows: 1fr auto; gap: 14px; min-height: 0; }
+  .now { padding: 22px 26px; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; position: relative; overflow: hidden; min-height: 300px; }
+  .now .live { position: absolute; top: 22px; left: 26px; display: flex; align-items: center; gap: 10px; }
+  .now .live::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--band); }
+  .now .title { font-size: calc(clamp(56px, 8.4vw, 118px) * var(--dscale)); overflow-wrap: anywhere; }
+  .now .meta { display: flex; gap: 8px; flex-wrap: wrap; }
+  .now .desc { color: var(--slab-muted); font-size: 17px; font-weight: 500; max-width: 52ch; }
+  .next { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pick { display: grid; gap: 6px; padding: 12px 14px; border: var(--rule) solid currentColor; border-radius: var(--radius); align-content: start; }
+  .pick.plays { background: var(--slab-bg, var(--slab)); color: var(--on-slab); border-color: transparent; }
+  .pick.plays .kicker { color: var(--slab-muted); }
+  .pick .t { font-size: calc(34px * var(--dscale)); }
+  .pick .g { font-size: var(--s-2); font-weight: 600; }
+  .why { grid-column: 1 / -1; font-size: 17px; font-weight: 600; border-top: 2px solid currentColor; padding-top: 10px; }
+  .side { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-height: 0; }
+  .join { padding: 14px; display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: center; }
+  .join img { width: 132px; height: 132px; display: block; background: #fff; }
+  .join p { font-weight: 800; font-size: 20px; line-height: 1.1; }
+  .join small { display: block; margin-top: 8px; font-size: var(--s-2); font-weight: 500; color: var(--muted); }
+  .join .url { display: block; margin-top: 6px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-weight: 600; }
+  .mix { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .mix h2 { font-size: calc(26px * var(--dscale)); }
+  .memory { margin-top: auto; border-top: 2px solid currentColor; padding-top: 10px; font-size: var(--s-2); display: grid; gap: 6px; }
+  .memory b { font-size: 15px; }
+  .memory .note { color: var(--muted); }
+  .memory .bars { gap: 5px; } .memory .bars .track { height: 6px; }
+  .refusals { display: grid; gap: 6px; }
+  .refusals .refusal { padding: 8px 10px; border-left-width: 6px; box-shadow: inset 0 0 0 2px currentColor; }
+  .refusals .refusal .code { font-size: 18px; }
+  .foot { display: grid; grid-template-columns: 1fr 340px; gap: 14px; align-items: stretch; }
+  .feed { display: flex; gap: 8px; overflow: hidden; align-items: center; padding: 8px 12px; min-height: 52px; }
+  .feed .kicker { white-space: nowrap; margin-right: 6px; color: var(--on-bg-muted); }
+  .ev { display: flex; align-items: center; gap: 8px; white-space: nowrap; background: var(--surface); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: var(--s-2); font-weight: 600; animation: ev-in var(--t-screen) var(--ease); }
+  .feed .kicker + .ev { box-shadow: inset 0 0 0 3px var(--band); }
+  .ev img { height: 15px; display: block; }
+  @keyframes ev-in { from { opacity: 0; transform: translateX(-10px); } }
+  .same { padding: 8px 14px; display: flex; align-items: center; gap: 12px; }
+  .same .figure { font-size: 40px; white-space: nowrap; }
+  .same p { font-size: 13px; font-weight: 600; line-height: 1.2; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .controls .btn { min-height: 38px; font-size: 14px; padding: 0 14px; text-decoration: none; }
+  .receipt { position: fixed; inset: 0; z-index: 30; display: grid; align-content: center; gap: 22px; padding: 6vh 7vw; }
+  .receipt h2 { font-size: calc(72px * var(--dscale)); max-width: 20ch; }
+  .receipt .figure { font-size: 180px; }
+  .receipt .sub { font-size: 24px; font-weight: 800; margin-top: -8px; }
+  .receipt .lines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 1100px; }
+  .receipt .line { background: var(--surface); color: var(--text); border-radius: var(--radius); padding: 14px 16px; font-size: 18px; font-weight: 600; }
+  .receipt .line b { display: block; font-size: 22px; }
+  .receipt .btn { justify-self: start; }
+  @media (max-width: 1000px) { .main, .foot { grid-template-columns: 1fr; } }
+  .now .caption-time { position: absolute; top: 24px; right: 26px; color: var(--slab-muted); }
+  .making-block { display: none; gap: 14px; }
+  .now.is-making { justify-content: flex-start; padding-top: 58px; }
+  .now.is-making .making-block { display: grid; }
+  .now.is-making > .title, .now.is-making > .meta, .now.is-making > .desc { display: none; }
+  .meter { display: flex; align-items: end; gap: 6px; height: 84px; }
+  .meter i { flex: 1; height: var(--h); background: var(--band-bg, var(--band)); border-radius: 2px; transform-origin: bottom; animation: lvl var(--d) ease-in-out infinite alternate; }
+  @keyframes lvl { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
+  .making-title { font-size: calc(clamp(48px, 6.2vw, 88px) * var(--dscale)); }
+  .making-for { font-weight: 700; font-size: 22px; }
+  .handover { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 18px; }
+  .handover .caption { color: var(--slab-muted); }
+  .next:has(#without-memory[hidden]) #with-memory { grid-column: 1 / -1; }
+  @media (prefers-reduced-motion: reduce) { .meter i { animation: none; } }
 </style>
 </head>
 <body>
-<div id="start-overlay"><button id="start-room" class="primary big" style="font-size:32px;padding:24px 36px">Start the room</button></div>
-<div class="grid">
-  <section>
-    <h1 id="venue-name" class="big">…</h1>
-    <div class="card">
-      <div class="label">Now playing <span id="now-clock" class="mono"></span></div>
-      <h2 id="now-title" class="big" data-track-id="">…</h2>
-      <div id="now-meta" class="mono mute">…</div>
-      <div id="now-provenance" class="label" style="color:var(--band)"></div>
-      <div id="now-why" class="mute"></div>
-      <div class="progress" style="margin-top:12px"><div id="now-progress"></div></div>
+<div id="start-overlay" class="start-overlay"><button id="start-room" class="btn forget" style="font-size:28px;min-height:76px;padding:0 40px">Start the room</button></div>
+
+<div class="room">
+  <header class="head">
+    <a class="wordmark" href="/" id="wordmark">Musory</a>
+    <h1 id="venue-name" class="display venue">…</h1>
+    <div class="right">
+      <div class="here"><span id="present" class="figure n" data-testid="present-count">0</span><span>checked in</span></div>
+      <span id="menu-slot"></span>
     </div>
-    <div class="card" style="margin-top:16px">
-      <div class="label">Next</div>
-      <h3 id="next-title" class="big" data-track-id="">…</h3>
-      <div id="next-why" class="mute"></div>
-      <div class="row" style="margin-top:10px">
-        <div>With memory: <b id="with-memory" class="mono">…</b></div>
-        <div id="without-memory-row">With no memory at all: <b id="without-memory" class="mono">…</b></div>
-      </div>
-      <div id="candidates" class="mono mute" style="font-size:12px;margin-top:8px"></div>
+  </header>
+
+  <div class="main">
+    <div class="left">
+      <section class="slab now" id="now-playing" data-testid="now-playing" data-track-id="">
+        <span class="kicker live"><span id="now-kicker">Now playing</span><span id="now-clock"></span></span><span class="caption caption-time" id="now-caption"></span>
+        <h2 id="now-title" class="display title fade-swap" data-track-id="">…</h2>
+        <div class="meta" id="now-meta"></div>
+        <p class="desc" id="now-desc"></p>
+        <p class="desc" id="now-why" hidden></p>
+        <div class="making-block" aria-live="polite">
+          <div class="meter" aria-hidden="true"><i style="--h:40%;--d:0.9s"></i><i style="--h:72%;--d:0.7s"></i><i style="--h:55%;--d:1.1s"></i><i style="--h:88%;--d:0.8s"></i><i style="--h:62%;--d:1s"></i><i style="--h:95%;--d:0.75s"></i><i style="--h:48%;--d:0.95s"></i><i style="--h:80%;--d:0.85s"></i><i style="--h:66%;--d:1.05s"></i><i style="--h:92%;--d:0.7s"></i><i style="--h:58%;--d:0.9s"></i><i style="--h:76%;--d:1s"></i><i style="--h:44%;--d:0.8s"></i><i style="--h:86%;--d:0.95s"></i><i style="--h:70%;--d:0.75s"></i><i style="--h:98%;--d:0.85s"></i><i style="--h:52%;--d:1.1s"></i><i style="--h:82%;--d:0.8s"></i><i style="--h:64%;--d:0.9s"></i><i style="--h:90%;--d:1s"></i><i style="--h:46%;--d:0.85s"></i><i style="--h:74%;--d:0.7s"></i><i style="--h:60%;--d:1.05s"></i><i style="--h:84%;--d:0.9s"></i></div>
+          <div class="display making-title">Making a new track</div>
+          <p class="making-for" id="making-for"></p>
+          <div class="handover"><span class="caption">Now</span><b id="making-now"></b><span class="count-arrow"></span><span class="caption">Next</span><b>A new track, ready in a few seconds</b><span class="logo-chip"><img src="/img/elevenlabs.svg" alt="ElevenLabs Music" style="height:12px"></span></div>
+        </div>
+        <div class="progress"><div id="now-progress"></div></div>
+      </section>
+      <section class="surface next" id="next-up" data-testid="next-up" data-track-id="">
+        <div class="pick plays" id="with-memory" data-testid="with-memory" data-track-id="">
+          <span class="kicker">With memory</span>
+          <div id="next-title" class="display t" data-track-id="">…</div>
+          <div class="g" id="with-genre"></div>
+        </div>
+        <div class="pick" id="without-memory" data-testid="without-memory" data-track-id="">
+          <span class="kicker">Without memory</span>
+          <div class="display t" id="without-title">…</div>
+          <div class="g" id="without-genre"></div>
+        </div>
+        <p class="why" id="next-why" data-testid="why"></p>
+        <div id="candidates" hidden></div>
+      </section>
     </div>
-    <div id="making" class="card hidden" style="margin-top:16px;border-color:var(--band)"></div>
-    <div class="card" style="margin-top:16px">
-      <div class="label">Room mix (what the next pick is aimed at)</div>
-      <div id="mix" class="bars"></div>
+
+    <aside class="side">
+      <section class="surface join">
+        <img id="qr" alt="QR code to check in at this venue">
+        <p>Scan to check in.<small>Your taste counts here only while you stay, and only if you say yes.</small><span class="url" id="join-url"></span></p>
+      </section>
+      <section class="surface mix">
+        <h2 class="display">What the room likes</h2>
+        <div id="mix" class="bars" data-testid="crowd-mix"></div>
+        <div class="memory" data-testid="venue-memory">
+          <b id="memory-title">This venue's own crowd memory</b>
+          <div id="memory"></div>
+          <div id="refusals" class="refusals"></div>
+          <span id="memory-login" hidden></span>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    <div class="rail feed" id="feed" data-testid="db-feed"><span class="kicker">Live from the database</span></div>
+    <div class="slab same" data-testid="same-query">
+      <span class="figure" id="same-count">0</span>
+      <p id="same-text">Records kept about guests who said forget me</p>
     </div>
-  </section>
-  <aside>
-    <div class="card row" style="align-items:flex-start">
-      <img id="qr" alt="QR code to check in to this venue">
-      <div>
-        <div class="label">Scan to check in</div>
-        <div id="join-url" class="mono" style="font-size:12px;word-break:break-all"></div>
-        <div style="margin-top:12px"><span class="label">Guests here</span><div id="present" class="big" style="font-size:48px">0</div></div>
-        <div id="tonight" class="mono"></div>
-      </div>
-    </div>
-    <div class="card" style="margin-top:16px">
-      <div class="label">This venue's crowd memory, read with <span id="memory-login" class="mono"></span></div>
-      <div id="memory"></div>
-      <div class="row" style="margin-top:10px">
-        <button id="read-other">Try reading the other venue's crowd memory</button>
-      </div>
-      <div id="refusals"></div>
-    </div>
-    <div class="card" style="margin-top:16px">
-      <div class="label">Live from the database (change streams)</div>
-      <div id="feed" class="feed"></div>
-    </div>
-    <div class="row" style="margin-top:12px">
-      <button id="skip">Play next now</button>
-      <button id="next-hour">Next hour</button>
-      <button id="compose" class="hidden">Compose the next clip (ElevenLabs Music)</button>
-      <button id="simulate">Simulated guests: 5 tap a new sound</button>
-      <button id="sound">Sound: on</button>
-      <a href="/proof">Proof</a>
-    </div>
-  </aside>
+  </footer>
+  <div class="controls">
+    <button id="skip" class="btn">Play next now</button>
+    <button id="next-hour" class="btn">Next hour</button>
+    <button id="sound" class="btn">Sound: on</button>
+    <button id="read-other" class="btn">Try reading the other venue's crowd memory</button>
+    <a class="btn" id="link-stage" href="/stage">Stage screen</a>
+    <a class="btn" id="link-how" href="/how">How it works, live</a>
+    <span id="help-slot"></span>
+  </div>
 </div>
-<div id="receipt" class="card hidden"></div>
+
+<section id="receipt" class="flood receipt hidden" data-testid="room-receipt"></section>
+<div id="tonight" hidden></div>
 <audio id="audio-a" preload="auto"></audio><audio id="audio-b" preload="auto"></audio>
 <script type="module" src="/js/room.js"></script>
 </body>

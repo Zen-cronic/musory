@@ -11,20 +11,22 @@ export function events(handlers) {
   return es;
 }
 export const $ = (id) => document.getElementById(id);
+const cap = (k) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : k);
+export const genreName = (g) => cap(String(g || "").replace(/&/g, "and"));
 export function bars(el, weights, max = 6) {
   const rows = Object.entries(weights || {}).sort((a, b) => b[1] - a[1]).slice(0, max);
   const total = rows.reduce((s, [, v]) => s + v, 0) || 1;
   el.innerHTML = rows.length
-    ? rows.map(([k, v]) => `<div class="bar" data-genre="${k}"><span>${k}</span><div><div class="fill" style="width:${Math.round((v / total) * 100)}%"></div></div><span class="mono">${Math.round((v / total) * 100)}%</span></div>`).join("")
-    : `<div class="mute">Nothing yet.</div>`;
+    ? rows.map(([k, v], i) => { const p = Math.round((v / total) * 100); return `<div class="bar-row${i === 0 ? " is-top" : ""}" data-genre="${k}"><span class="name">${genreName(k)}</span><span class="track"><span class="fill" style="width:${p}%"></span></span><span class="pct">${p}%</span></div>`; }).join("")
+    : `<div class="note">Nothing yet.</div>`;
 }
 export function toast(msg) {
   let t = document.querySelector(".toast");
-  if (!t) { t = document.createElement("div"); t.className = "toast"; t.id = "toast"; document.body.appendChild(t); }
+  if (!t) { t = document.createElement("div"); t.className = "toast"; t.id = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
   t.textContent = msg;
-  t.classList.remove("hidden");
+  requestAnimationFrame(() => t.classList.add("show"));
   clearTimeout(t._h);
-  t._h = setTimeout(() => t.classList.add("hidden"), 2600);
+  t._h = setTimeout(() => t.classList.remove("show"), 2600);
 }
 export function progress(el, play) {
   if (!play) return;
@@ -36,7 +38,13 @@ export function progress(el, play) {
   el._play = play;
   tick();
 }
+// Plain words for each refusal code. The reason from the server says what happened; this says why.
+const WHY = {
+  121: "The database checks every memory against its rules before saving.",
+  13: "Each venue's login can only read its own crowd memory.",
+  11000: "One like per guest per track.",
+};
 export function refusalTicket(r) {
-  const code = r.code === 11000 ? "E11000" : `${r.code}${r.codeName ? " " + r.codeName : ""}`;
-  return `<div class="ticket" data-code="${r.code}"><div><b>${r.reason || "The database refused this."}</b></div><div class="code">Database refused it: code ${code}</div><div class="mono" style="font-size:11px">${r.where || ""}</div></div>`;
+  const code = r.code === 11000 ? "11000" : String(r.code);
+  return `<div class="refusal" data-code="${r.code}"><span class="code">${code}</span><span class="what">${r.reason || "The database refused this."}</span><span class="why">${WHY[r.code] || "The database refused it."}</span></div>`;
 }
