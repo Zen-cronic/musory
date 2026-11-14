@@ -5,10 +5,9 @@
 // The clip record holds the aggregate mix and the number of people behind it (3 or more), never a
 // guest id or tap id. It names the taste and crowd memory documents it came from (derivedFrom), so
 // forget me deletes it, and its file, with everything else built from that guest.
-import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ObjectId, type Document } from "mongodb";
+import { Binary, ObjectId, type Document } from "mongodb";
 import { db, DERIVED, VENUES, type VenueId } from "./db.js";
 import * as room from "./room.js";
 import { fail, rooms, queueClip, advance, setDecisionHook, setComposingCheck, currentGenre, composeSoon } from "./room.js";
@@ -144,8 +143,10 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
       return { ok: false, venueId, discarded: true };
     }
     const id = new ObjectId();
-    mkdirSync(GEN_DIR, { recursive: true });
-    writeFileSync(path.join(GEN_DIR, `${id.toHexString()}.mp3`), audio);
+    // The sound itself lives in the clip's own document in Atlas (about 250 KB), so forget me and the
+    // closing-time expiry delete the audio with the record. Nothing is written to disk.
+    if (audio.length > 15 * 1024 * 1024) throw fail(502, "Composed track too large to store.");
+    const url = `/api/audio/${id.toHexString()}`;
     const ms = Date.now() - t0;
     const doc = {
       _id: id,
@@ -157,7 +158,8 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
       people,
       descriptors,
       plan,
-      audio: `/audio/gen/${id.toHexString()}.mp3`,
+      audio: { mime: "audio/mpeg", bytes: new Binary(audio) },
+      audioUrl: url,
       ms,
       at: new Date(),
       expiresAt: closingAfter(),
@@ -172,13 +174,13 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
       title: `Made for ${VENUES[venueId].name}`,
       genre: genres.join(" + "),
       bpm,
-      audio: doc.audio,
+      audio: url,
       descriptor: plan.chunks.map((c) => c.positive_styles.join(", ")).join(" | "),
     });
     emit("music_gen", { venueId, model: MUSIC_MODEL, mode, descriptors, people, ms, late: fellBack });
     // Arrived in time: crossfade into it now. Arrived late: it plays next.
     if (!fellBack) await advance(venueId);
-    return { ok: true, venueId, ms, mode, descriptors, people, audio: doc.audio, late: fellBack };
+    return { ok: true, venueId, ms, mode, descriptors, people, audio: url, late: fellBack };
   } catch (e) {
     clearTimeout(timer);
     if (!fellBack) {

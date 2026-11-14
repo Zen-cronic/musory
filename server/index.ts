@@ -3,9 +3,10 @@ import express from "express";
 import path from "node:path";
 import os from "node:os";
 import { existsSync } from "node:fs";
+import { ObjectId } from "mongodb";
 import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
-import { db, redactError, isVenue, VENUES, VENUE_IDS, TAPS, DERIVED, PRESENCE, CONSENTS, SESSIONS, PREFS, PLAYS, TOMBSTONES, type VenueId } from "./db.js";
+import { db, redactError, isVenue, VENUES, VENUE_IDS, TRACKS, TAPS, DERIVED, PRESENCE, CONSENTS, SESSIONS, PREFS, PLAYS, TOMBSTONES, type VenueId } from "./db.js";
 import { subscribe, emit, recentEvents, clientCount } from "./events.js";
 import {
   HttpError, fail, loadTracks, startPlayer, resetAndSeed, roomState, me, personOf, checkin, checkout, tap, bored, undoBored,
@@ -38,11 +39,15 @@ const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 export function isLocalAdmin(req: express.Request): boolean {
   const token = process.env.ADMIN_TOKEN;
   if (token && req.get("x-admin-token") === token) return true;
-  const proxied = Boolean(req.get("cf-ray") || req.get("cf-connecting-ip") || req.get("x-forwarded-for") || req.get("forwarded"));
+  const proxied = Boolean(
+    req.get("cf-ray") || req.get("cf-connecting-ip") || req.get("x-forwarded-for") || req.get("forwarded") || req.get("x-musory-public") === "1",
+  );
   return !proxied && LOOPBACK.has(req.socket.remoteAddress ?? "");
 }
 app.use((req, res, next) => {
-  if (req.method !== "GET" && ADMIN.some((r) => r.test(req.path)) && !isLocalAdmin(req)) {
+  // Routes match case-insensitively and with a trailing slash, so the lock normalises the path the same way.
+  const p = req.path.toLowerCase().replace(/\/+$/, "") || "/";
+  if (req.method !== "GET" && ADMIN.some((r) => r.test(p)) && !isLocalAdmin(req)) {
     res.status(403).json({ error: { message: "Room controls work only on the venue's own screen." } });
     return;
   }
@@ -190,6 +195,32 @@ app.post("/api/stage/base-url", wrap(async (req) => {
 app.post("/api/stage/clear-load", wrap(async () => clearLoadGuests()));
 app.post("/api/stage/simulate", wrap(async (req) => simulateGuests(venueOf(req.body?.venueId ?? "copper"), req.body?.genre ? String(req.body.genre) : undefined)));
 let ready = false; // true once tracks are loaded, change streams are on and the rooms are playing
+// Every sound the rooms play is read from Atlas. Catalogue tracks (shared, nothing personal) may be cached;
+// a track made for a room is never cached and is gone (404) once forget me or closing time deletes its record.
+const catalogueAudio = new Map<string, Buffer>();
+async function sendAudio(id: string, res: express.Response) {
+  const d = await db();
+  if (/^t\d{2}$/.test(id)) {
+    let buf = catalogueAudio.get(id);
+    if (!buf) {
+      const doc = await d.collection(TRACKS).findOne({ _id: id as never }, { projection: { audio: 1 } });
+      const b = doc?.audio?.bytes as { buffer: Uint8Array } | undefined;
+      if (!b) return void res.status(404).end();
+      buf = Buffer.from(b.buffer);
+      catalogueAudio.set(id, buf);
+    }
+    res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=86400", "Content-Length": String(buf.length) });
+    return void res.end(buf);
+  }
+  if (!/^[a-f0-9]{24}$/.test(id)) return void res.status(404).end();
+  const doc = await d.collection(DERIVED).findOne({ _id: new ObjectId(id), kind: "clip" }, { projection: { audio: 1 } });
+  const b = doc?.audio?.bytes as { buffer: Uint8Array } | undefined;
+  if (!b) return void res.status(404).end();
+  res.set({ "Content-Type": "audio/mpeg", "Cache-Control": "no-store", "Content-Length": String(b.buffer.length) });
+  res.end(Buffer.from(b.buffer));
+}
+for (const route of ["/api/audio/:id", "/api/clip/:id"])
+  app.get(route, (req, res) => sendAudio(String(req.params.id), res).catch((e) => res.status(500).json({ error: redactError(e) })));
 app.get("/api/health", (_req, res) => res.json({ ok: true, ready, clients: clientCount(), rooms: VENUE_IDS.map((v) => ({ v, play: rooms[v].play?.trackId })) }));
 
 // Change streams: rooms and screens are driven by what the database commits.

@@ -116,6 +116,32 @@ for (const v of ["copper", "basement"]) {
   const preview = (w.venues ?? []).find((x: any) => x.venueId === v)?.withoutYou?.trackId;
   check(`${v}: now playing the pick without them`, Boolean(now && now === promised), `${now} vs ${promised}; preview ${preview}`);
 }
+// Room controls refuse anything that looks like it came through the public link, however the path is spelled.
+for (const p of ["/api/reset", "/API/RESET", "/api/reset/", "/api/stage/simulate"]) {
+  const r = await fetch(BASE + p, { method: "POST", headers: { "content-type": "application/json", "x-musory-public": "1" }, body: "{}" });
+  check(`room control ${p} through the public link is refused (403)`, r.status === 403);
+}
+// Every sound comes from Atlas: a catalogue track streams from its track document.
+const cat = await fetch(BASE + "/api/audio/t01");
+check("a catalogue track's sound streams from Atlas", cat.status === 200 && cat.headers.get("content-type") === "audio/mpeg" && (await cat.arrayBuffer()).byteLength > 100_000);
+// With live music on: Jess checks in, the room makes a track from her taste, and forget me deletes its sound.
+const cfg = await api("/api/config");
+if (cfg.musicLive) {
+  await api("/api/checkin", { personId: "g-jess", venueId: "copper" });
+  let made: any = null;
+  for (let i = 0; i < 30 && !made; i++) {
+    await sleep(500);
+    made = streamed.find((e) => e.type === "play" && e.data.venueId === "copper" && e.data.play?.composed);
+  }
+  const url = made?.data.play.audio as string | undefined;
+  const got = url ? await fetch(BASE + url) : null;
+  check("a track made for the room streams from its record in Atlas, never cached", Boolean(got && got.status === 200 && got.headers.get("cache-control") === "no-store"), url ?? "no track made");
+  await api("/api/forget", { personId: "g-jess" });
+  const gone = url ? await fetch(BASE + url) : null;
+  check("after forget me, the made track's sound is gone (404)", Boolean(gone && gone.status === 404));
+}
+const { readdirSync, existsSync } = await import("node:fs");
+check("no sound files are written to disk", !existsSync("public/audio/gen") || readdirSync("public/audio/gen").length === 0);
 await sleep(800);
 const fe = streamed.filter((e) => e.type === "forgotten");
 check("the screens' forget-me event carries no guest label or id", fe.length > 0 && fe.every((e) => !("label" in e.data) && !("personId" in e.data) && !JSON.stringify(e.data).includes(guest)));

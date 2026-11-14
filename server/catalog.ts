@@ -13,7 +13,7 @@ export type Track = {
 
 const t = (n: number, title: string, genre: string, bpm: number, energy: number, descriptor: string): Track => {
   const id = `t${String(n).padStart(2, "0")}`;
-  return { _id: id, title, genre, bpm, energy, descriptor, audio: `/audio/${id}.mp3` };
+  return { _id: id, title, genre, bpm, energy, descriptor, audio: `/api/audio/${id}` }; // the sound is stored in Atlas
 };
 
 export const TRACKS: Track[] = [

@@ -167,7 +167,7 @@ async function main() {
   if (!vectors) throw new Error("Voyage embedding failed; check VOYAGE_API_KEY");
   await d.collection(TRACKS_COLL).deleteMany({ _id: { $nin: TRACKS.map((t) => t._id) } as never });
   for (const [i, tr] of TRACKS.entries())
-    await d.collection(TRACKS_COLL).replaceOne({ _id: tr._id as never }, { ...tr, embedding: vectors[i] }, { upsert: true });
+    await d.collection(TRACKS_COLL).updateOne({ _id: tr._id as never }, { $set: { ...tr, embedding: vectors[i] } }, { upsert: true }); // keeps stored audio
   console.log("tracks embedded:", TRACKS.length, "dims:", vectors[0].length);
 
   for (const name of [TAPS, DERIVED]) {

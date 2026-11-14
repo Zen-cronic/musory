@@ -3,7 +3,6 @@
 // blended from the guests in the room, the venue's crowd memory and the current track.
 import { ObjectId, type ClientSession, type Document } from "mongodb";
 import { createHmac } from "node:crypto";
-import { rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -15,7 +14,6 @@ import { TRACKS as CATALOG, byId, GENRES } from "./catalog.js";
 import { emit } from "./events.js";
 
 const DAY = 86_400_000;
-const GEN_DIR = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), "public", "audio", "gen");
 const PLAY_MS = Number(process.env.PLAY_MS || 15_000); // each clip is 15 s
 const TONIGHT_MS = Number(process.env.TONIGHT_MS || 120_000); // demo clock for "tonight only"
 const RECENT_TAP_MS = 120_000; // guests who just arrived or reacted in the last 2 minutes count 3x in the room blend
@@ -944,7 +942,6 @@ async function forgetInner(personId: string) {
   cfMs = await cfP;
   for (const id of clipIds) {
     const hex = id.toHexString();
-    rmSync(path.join(GEN_DIR, `${hex}.mp3`), { force: true });
     for (const [k, m] of genClips) if (m.clipId === hex) genClips.delete(k);
     for (const v of VENUE_IDS) if (rooms[v].queued?.clipId === hex) rooms[v].queued = undefined;
   }

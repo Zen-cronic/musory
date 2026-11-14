@@ -47,11 +47,24 @@ Other rules the database enforces (`validationLevel: "constraint"`, error 121 ot
 - One reaction per guest per track (unique index, E11000).
 - Taps live at most 180 days (TTL index); check-ins and tonight-only sessions expire too.
 
+## Everything lives in MongoDB
+
+Tracks made from guests' taste are stored inside MongoDB, so forget me deletes the sound itself in the same transaction, and closing time deletes it automatically (a TTL index on the clip records, which Atlas runs about once a minute). The 19 catalogue clips are stored there too, each in its track document; `GET /api/audio/<id>` streams every sound from Atlas, and only the shared catalogue clips may be cached.
+
 ## How fast it is (measured on the Atlas sandbox, 2026-11-14)
 
 - A guest checks in and their taste changes the room: the room plays a track made for it about 4 seconds later (ElevenLabs takes about 2.5 seconds of that).
 - Five simulated guests tap a new sound: a new track made for the room is playing about 6 seconds later.
 - Forget me: the room crossfades to the track it promised without the guest about 2.3 seconds after the request, and the full receipt arrives about a second later, once the pick has been recomputed from what is left in the database. With the durable forget job on, add about 1.5 seconds.
+
+## "What was that track?"
+
+A guest can type a few words about something they heard ("dark rolling bassline, fast") and get the track back. The words are embedded with Voyage and matched against the clips' descriptions with Atlas Vector Search, then the top results are reordered by Voyage's reranker (`rerank-3`, through the Voyage API). In a test with 20 descriptions we wrote, the right track came first 18 times with the reranker, 17 times without it, and 11 times with keyword search or with `$rankFusion` combining keyword and vector search, so the hybrid search is not used. That was the only alternative we tried, with no tuning. Turn it on with `FIND_TRACK=1` (and `FIND_RERANK=1` for the reranker).
+
+## Checks that run on their own
+
+- **The follow-up to forget me.** Forget is one transaction. The follow-up checks run as a LangGraph job with a MongoDB checkpointer, so once started they finish even if the server restarts. A crash in the fraction of a second after the delete commits can skip the follow-up check, never the delete. Turn it on with `FORGET_GRAPH=1`.
+- **Evaluations (LangSmith).** `EVAL_ALLOW_RESET=1 pnpm eval` runs scripted scenarios through LangSmith `evaluate()` against the running server (it resets the demo data), with plain-code checks and no model grading; with `LANGSMITH_API_KEY` set the experiment is uploaded, without it the run stays local. It checks that forget me reaches 0 records; Basement 2 is refused Copper Room's crowd memory; a tonight-only tap never enters long-term taste; a guest who did not consent changes nothing; nothing about a forgotten guest is left in the job's checkpoints.
 
 ## How forget me reaches every copy
 
@@ -77,6 +90,7 @@ pnpm install
 cp .env.example .env      # fill in the Atlas host, logins, Voyage and ElevenLabs keys
 pnpm setup:db             # collections, validators, indexes, Views, track embeddings
 pnpm setup:vector         # Vector Search index on tracks
+pnpm setup:audio          # stores catalogue clips (public/audio/tNN.mp3, if you have the files) in their track documents
 pnpm start                # http://localhost:4377/
 pnpm smoke                # end-to-end checks against the running server
 ```
@@ -90,7 +104,7 @@ pnpm smoke                # end-to-end checks against the running server
 
 ## What's simulated and what isn't
 
-- **Real:** every database rule, refusal, transaction, change stream and vector search above runs live on Atlas. The clips are real ElevenLabs Music generations. The embeddings are real Voyage calls (cached on disk so a reset doesn't spend the rate limit).
+- **Real:** every sound streams from Atlas. Every database rule, refusal, transaction, change stream and vector search above runs live on Atlas. The clips are real ElevenLabs Music generations. The embeddings are real Voyage calls (cached on disk so a reset doesn't spend the rate limit).
 - **Simulated:** the venues, their regulars from "last weekend" and the guests are seeded. A **Simulated guests** button makes five seeded guests like two samples of one sound, so the room can be shown without phones; it is labelled as simulated on screen. The time of night is a demo clock ("Next hour"). Clips are 15 seconds, so a room's set moves fast. "Tonight only" lasts 2 minutes in the demo.
 - **Not built:** real venue sound systems or DJ software; the room plays clips in a browser. Transitions are crossfades (1 second between catalogue tracks, about 3 seconds with filter sweeps into a new track), not beat-matched mixing.
 - **Limits we know about:** Atlas backups and the oplog keep data for their own retention windows; the validator checks what the server writes onto a document (it trusts the copied owner ids). TTL expiry runs about once a minute, not instantly. A pick reveals a little about who is in the room. Live composition sends ElevenLabs only genre, tempo and texture words from the room's blend, never anything about a guest. A composed track's record keeps the room's mix, the number of people behind it (3 or more) and the tap ids it was built from, so forget me deletes it and its file; copies ElevenLabs keeps under its own terms are outside this app's reach. Live composition is capped at 60 tracks a day and one per room every 20 seconds.
