@@ -14,6 +14,7 @@ import { Client } from "langsmith";
 import { saveEval, type EvalMetric } from "../server/evals.js";
 import { closeAll, db } from "../server/db.js";
 import { findTrack } from "../server/find.js";
+import { TRACKS } from "../server/catalog.js";
 
 const BASE = (process.env.EVAL_BASE_URL || `http://localhost:${process.env.PORT || 4377}`).replace(/\/$/, "");
 const args = process.argv.slice(2);
@@ -239,7 +240,7 @@ const guaranteeEvaluators = ([
 ] as ((a: any) => any)[]).map((f) => (a: any) => (a.outputs?.receipt ? f(a) : na()));
 const PASS_FAIL = ["no_trace_left", "forget_zero_records", "forget_matches_pick_without_you", "tonight_never_in_taste", "venue_b_refused", "no_consent_no_influence"];
 
-// Find that track: words only, meaning only, and both fused, over the whole 21-track catalogue.
+// Find that track: words only, meaning only, and both fused, over the whole catalogue.
 // Two hand-written sets, both written before any run: "literal" reuses words from the track's
 // description or title; "paraphrase" shares no content word with the answer's description.
 const FIND_CASES: { q: string; want: string; set?: string }[] = [
@@ -328,7 +329,7 @@ async function main() {
   const url = await experimentUrl(res.experimentName);
   const m = (k: string) => metrics.get(k);
   const sentence = isFind
-    ? `Find that track, ${picked.length} hand-written descriptions, 21-track catalogue: words ${m("hit_at_1_words")?.passed ?? 0}/${picked.length}, meaning ${m("hit_at_1_meaning")?.passed ?? 0}/${picked.length}, hybrid ${m("hit_at_1_hybrid")?.passed ?? 0}/${picked.length} found first.`
+    ? `Find that track, ${picked.length} hand-written descriptions, ${TRACKS.length}-track catalogue: words ${m("hit_at_1_words")?.passed ?? 0}/${picked.length}, meaning ${m("hit_at_1_meaning")?.passed ?? 0}/${picked.length}, hybrid ${m("hit_at_1_hybrid")?.passed ?? 0}/${picked.length} found first.`
     : `${passed} of ${picked.length} scripted forget-me runs on the real API: no trace of the guest's id left in any collection, and each room's next pick matched the pick computed, before the delete, without that guest. Tonight-only taps were refused from taste (121) and venue B was refused venue A (13, checked once per run).`;
   await saveEval({
     suite: isFind ? "find-track" : "guarantees",
