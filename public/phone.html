@@ -73,6 +73,30 @@
   .find .result { display: grid; gap: 2px; padding: 10px 12px; box-shadow: inset 0 0 0 2px currentColor; }
   .find .result b { font-size: 20px; }
   [data-film] .find { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  #venue-name { font-size: calc(30px * var(--dscale)) !important; }
+  .phone { gap: 12px; }
+  .swipe-wrap { position: relative; height: clamp(320px, 56vh, 500px); margin: 4px 6px 14px; }
+  .swipe-wrap::before { content: ""; position: absolute; inset: 0; border-radius: 12px; background: var(--surface-bg, var(--surface)); transform: translateY(32px) scale(.92); opacity: .75; box-shadow: inset 0 0 0 1px var(--slab-line); }
+  .swipe-wrap > .swipe-card { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; padding: 24px 22px 54px; touch-action: pan-y; }
+  .swipe-card .t { font-size: calc(clamp(42px, 13vw, 60px) * var(--dscale)) !important; line-height: .92; }
+  .swipe-card .g { font-size: 18px !important; }
+  .edge { position: absolute; bottom: 18px; font: 700 13px var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--slab-muted); }
+  .edge-l { left: 22px; } .edge-r { right: 22px; color: var(--band); }
+  .swipe-wrap .stamp { top: 22px; font-size: 34px; padding: 6px 14px; border-radius: 10px; border-width: 4px; }
+  .swipe-wrap .stamp-like { right: 22px; } .swipe-wrap .stamp-skip { left: 22px; }
+  .swipe-card.nudge { animation: nudge 1.3s .7s 1 cubic-bezier(.16, 1, .3, 1); }
+  @keyframes nudge { 0%, 100% { transform: none; } 35% { transform: translateX(26px) rotate(6deg); } 65% { transform: translateX(-6px) rotate(-1deg); } }
+  .actions { gap: 40px; }
+  .round { width: 64px; height: 64px; }
+  .round span { font-size: 24px; } .round b { font-size: 11px; }
+  .vibe { padding: 10px 12px; }
+  .vibe input { min-height: 44px; font-size: 15px; }
+  .more > summary.btn { align-self: center; justify-self: center; min-height: 44px; border-color: transparent; font-size: 15px; color: var(--on-bg-muted); }
+  .phone > section#main > details.more { align-items: center; }
+  #without-you { font-size: 14px; display: grid; gap: 4px; }
+  @media (prefers-reduced-motion: reduce) { .swipe-card.nudge { animation: none; } }
+
   .swipe-wrap { position: relative; touch-action: pan-y; }
   .swipe-card { position: relative; padding: 18px 16px; gap: 6px; cursor: grab; user-select: none; transition: transform .2s var(--ease); }
   .swipe-card.dragging { transition: none; cursor: grabbing; }
@@ -140,7 +164,7 @@
         <h2 id="now-title" class="display t" data-track-id="">…</h2>
         <span id="now-meta" class="g"></span>
         <div class="progress"><div id="now-progress"></div></div>
-        <span class="hint">Swipe right to like, left to skip</span>
+        <span class="edge edge-l" aria-hidden="true">&larr; Skip</span><span class="edge edge-r" aria-hidden="true">Like &rarr;</span>
       </div>
     </div>
     <div class="actions">
@@ -148,9 +172,9 @@
       <button id="like" class="round like" data-testid="like" aria-label="Like"><span aria-hidden="true">♥</span><b>Like</b></button>
     </div>
     <div class="surface card vibe" id="vibe">
-      <label for="vibe-q"><h2 class="display">Tell the room what you want</h2></label>
+      <label for="vibe-q" class="sr-only">Tell the room what you want</label>
       <form id="vibe-form" autocomplete="off">
-        <input id="vibe-q" type="text" maxlength="120" placeholder="something dark and driving" aria-label="Tell the room what you want">
+        <input id="vibe-q" type="text" maxlength="120" placeholder="Tell the room: upbeat, with more bass" aria-label="Tell the room what you want">
         <button id="vibe-send" class="btn small" type="submit">Send</button>
       </form>
       <div id="vibe-result" class="note"></div>
@@ -195,13 +219,13 @@
   </section>
 
   <section id="forget-section" class="hidden">
-    <div id="without-you" class="surface card"></div>
     <button id="forget" class="btn forget like" data-testid="forget-me">Forget me</button>
     <p class="forget-note">Removes you from every venue's memory.</p>
     <div id="forget-confirm" class="surface card confirm hidden">
       <h2 class="display">Forget me everywhere?</h2>
       <ul><li>Your likes and your taste are deleted.</li><li>Your share of each venue's crowd memory is removed.</li><li>Both rooms pick their next track without you.</li></ul>
       <p>This can't be undone. Each venue keeps its own notes, which never had your name.</p>
+      <div id="without-you"></div>
       <button id="forget-yes" class="btn forget" data-testid="forget-confirm">Yes, forget me</button>
       <button id="forget-no" class="btn">Cancel</button>
     </div>

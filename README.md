@@ -9,7 +9,7 @@ Bars and clubs play one playlist for everyone. I love electronic music. Not ever
 ## What a guest does
 
 1. Scan the venue's QR code and choose what to share.
-2. Swipe the track that's playing: right to like, left to skip. Or type what you want, like "something dark and driving". The room picks its next track from the people there.
+2. Swipe the track that's playing: right to like, left to skip. Or type what you want, like "upbeat, with more bass". The room picks its next track from the people there.
 3. When the crowd's likes shift, ElevenLabs Music makes a new track for them and the room crossfades into it.
 
 ## What forget me does
@@ -88,7 +88,7 @@ Tracks made from guests' taste are stored inside MongoDB, so forget me deletes t
 
 ## "What was that track?"
 
-A guest can type a few words about something they heard ("dark rolling bassline, fast") and get the track back. The words are embedded with Voyage and matched against the clips' descriptions with Atlas Vector Search, then the top results are reordered by Voyage's reranker (`rerank-3`, through the Voyage API). In a test with 20 descriptions we wrote, the right track came first 18 times with the reranker, 17 times without it, and 11 times with keyword search or with `$rankFusion` combining keyword and vector search, so the hybrid search is not used. That was the only alternative we tried, with no tuning. The reranker orders catalogue matches. When tracks made for the room are mixed in, results are ordered by vector score. Turn it on with `FIND_TRACK=1` (and `FIND_RERANK=1` for the reranker).
+A guest can type a few words about something they heard ("rolling bassline, fast") and get the track back. The words are embedded with Voyage and matched against the clips' descriptions with Atlas Vector Search, then the top results are reordered by Voyage's reranker (`rerank-3`, through the Voyage API). In a test with 20 descriptions we wrote, the right track came first 18 times with the reranker, 17 times without it, and 11 times with keyword search or with `$rankFusion` combining keyword and vector search, so the hybrid search is not used. That was the only alternative we tried, with no tuning. The reranker orders catalogue matches. When tracks made for the room are mixed in, results are ordered by vector score. Turn it on with `FIND_TRACK=1` (and `FIND_RERANK=1` for the reranker).
 
 ## Checks that run on their own
 
