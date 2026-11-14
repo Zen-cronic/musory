@@ -6,8 +6,8 @@
 // We measured before choosing (scripts/eval.ts --suite find, 20 hand-written
 // descriptions): $rankFusion of Atlas Search (txt_tracks) + Vector Search with equal weights found
 // 11/20 first, words alone 11/20, meaning alone 17/20, meaning then Voyage rerank-3 18/20.
-// Descriptions of music rarely reuse the
-// catalogue's words, so the product uses meaning alone; mode=compare returns all three.
+// Descriptions of music rarely reuse the catalogue's words, so the product uses meaning, plus
+// rerank-3 over the top five when FIND_RERANK=1; mode=compare returns every method.
 import type { Document } from "mongodb";
 import { db, TRACKS, PLAYS, isVenue, type VenueId } from "./db.js";
 import { EMBED_MODEL, hasVoyage } from "./embed.js";
