@@ -289,7 +289,7 @@ async function main() {
     ? async (inp: Record<string, any>) => findTrack("all", inp.q, "compare")
     : runScenario;
   const evaluators = isFind
-    ? (["words", "meaning", "hybrid"] as const).map((m) => ({ outputs, referenceOutputs, inputs }: any) => ({
+    ? (["words", "meaning", "hybrid", "reranked"] as const).map((m) => ({ outputs, referenceOutputs, inputs }: any) => ({
         key: `hit_at_1_${m}`,
         score: outputs?.[m]?.[0]?.trackId === referenceOutputs?.want ? 1 : 0,
         comment: `${inputs.set}: "${inputs.q}" -> ${outputs?.[m]?.[0]?.trackId ?? "none"} (want ${referenceOutputs?.want})`,
@@ -313,7 +313,7 @@ async function main() {
   for (const row of res.results) {
     if (isFind) {
       const set = String(row.example.inputs.set);
-      perSet[set] ??= { n: 0, words: 0, meaning: 0, hybrid: 0 };
+      perSet[set] ??= { n: 0, words: 0, meaning: 0, hybrid: 0, reranked: 0 };
       perSet[set].n++;
       for (const r of row.evaluationResults.results) if (r.score === 1) perSet[set][r.key.replace("hit_at_1_", "")]++;
     }
@@ -334,7 +334,7 @@ async function main() {
   const url = await experimentUrl(res.experimentName);
   const m = (k: string) => metrics.get(k);
   const sentence = isFind
-    ? `Find that track, ${picked.length} hand-written descriptions, ${TRACKS.length}-track catalogue: words ${m("hit_at_1_words")?.passed ?? 0}/${picked.length}, meaning ${m("hit_at_1_meaning")?.passed ?? 0}/${picked.length}, hybrid ${m("hit_at_1_hybrid")?.passed ?? 0}/${picked.length} found first.`
+    ? `Find that track, ${picked.length} hand-written descriptions, ${TRACKS.length}-track catalogue: words ${m("hit_at_1_words")?.passed ?? 0}/${picked.length}, meaning ${m("hit_at_1_meaning")?.passed ?? 0}/${picked.length}, hybrid ${m("hit_at_1_hybrid")?.passed ?? 0}/${picked.length}, meaning + Voyage rerank-3 ${m("hit_at_1_reranked")?.passed ?? 0}/${picked.length} found first.`
     : `${passed} of ${picked.length} scripted forget-me runs on the real API: no trace of the guest's id left in any collection, and each room's next pick matched the pick computed, before the delete, without that guest. Tonight-only taps were refused from taste (121) and venue B was refused venue A (13, checked once per run).`;
   await saveEval({
     suite: isFind ? "find-track" : "guarantees",
@@ -342,7 +342,7 @@ async function main() {
     scenarios: picked.length,
     passed: isFind ? (m("hit_at_1_hybrid")?.passed ?? 0) : passed,
     metrics: list,
-    measured: isFind ? Object.fromEntries(Object.entries(perSet).map(([k, v]) => [k, `n ${v.n}: words ${v.words}, meaning ${v.meaning}, hybrid ${v.hybrid}`])) : { memoryChangedPick: `${m("memory_changed_pick")?.passed ?? 0}/${m("memory_changed_pick")?.total ?? 0}`, guestChangedPick: `${m("guest_changed_pick")?.passed ?? 0}/${m("guest_changed_pick")?.total ?? 0}`, errors, forgetMsMedian: forgetTimes.sort((a, b) => a - b)[Math.floor(forgetTimes.length / 2)] ?? 0, forgetMsMax: Math.max(0, ...forgetTimes) },
+    measured: isFind ? Object.fromEntries(Object.entries(perSet).map(([k, v]) => [k, `n ${v.n}: words ${v.words}, meaning ${v.meaning}, hybrid ${v.hybrid}, reranked ${v.reranked}`])) : { memoryChangedPick: `${m("memory_changed_pick")?.passed ?? 0}/${m("memory_changed_pick")?.total ?? 0}`, guestChangedPick: `${m("guest_changed_pick")?.passed ?? 0}/${m("guest_changed_pick")?.total ?? 0}`, errors, forgetMsMedian: forgetTimes.sort((a, b) => a - b)[Math.floor(forgetTimes.length / 2)] ?? 0, forgetMsMax: Math.max(0, ...forgetTimes) },
     langsmith: { uploaded: upload, experiment: res.experimentName, url, dataset: upload ? name : undefined },
     sentence: upload ? sentence : `${sentence} (local run)`,
   });

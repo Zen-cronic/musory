@@ -3,9 +3,10 @@
 // Voyage AI voyage-4, limited to tracks this room played tonight. The guest's words go to Voyage
 // to make one query vector; Musory doesn't save, cache or log them.
 //
-// We measured hybrid search before choosing (scripts/eval.ts --suite find, 20 hand-written
+// We measured before choosing (scripts/eval.ts --suite find, 20 hand-written
 // descriptions): $rankFusion of Atlas Search (txt_tracks) + Vector Search with equal weights found
-// 11/20 first, words alone 11/20, meaning alone 17/20. Descriptions of music rarely reuse the
+// 11/20 first, words alone 11/20, meaning alone 17/20, meaning then Voyage rerank-3 18/20.
+// Descriptions of music rarely reuse the
 // catalogue's words, so the product uses meaning alone; mode=compare returns all three.
 import type { Document } from "mongodb";
 import { db, TRACKS, PLAYS, isVenue, type VenueId } from "./db.js";
@@ -28,6 +29,25 @@ async function embedQuery(q: string): Promise<number[] | null> {
     if (!r.ok) return null;
     const j = (await r.json()) as { data: { embedding: number[] }[] };
     return j.data[0]?.embedding ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Voyage rerank-3 via the Voyage API (not Atlas $rerank): re-orders the top Vector Search candidates
+// by reading each track's text description next to the guest's words. Used only when FIND_RERANK=1.
+export const rerankOn = () => process.env.FIND_RERANK === "1";
+async function rerank(q: string, hits: Hit[], texts: Map<string, string>): Promise<Hit[] | null> {
+  if (!hasVoyage() || hits.length < 2) return null;
+  try {
+    const r = await fetch("https://api.voyageai.com/v1/rerank", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.VOYAGE_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ query: q, documents: hits.map((h) => texts.get(h.trackId) ?? h.title), model: "rerank-3" }),
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { data: { index: number; relevance_score: number }[] };
+    return j.data.sort((a, b) => b.relevance_score - a.relevance_score).map((x) => hits[x.index]);
   } catch {
     return null;
   }
@@ -64,7 +84,7 @@ export async function findTrack(venueArg: unknown, qArg: unknown, modeArg?: unkn
   const meaning: Document[] | null = vector
     ? [{ $vectorSearch: { index: "vec_tracks", path: "embedding", queryVector: vector, exact: true, limit: 21 } }, ...only, { $limit: 10 }]
     : null;
-  const project = { $project: { title: 1, genre: 1, bpm: 1 } };
+  const project = { $project: { title: 1, genre: 1, bpm: 1, descriptor: 1 } };
   const d = await db();
   const tracks = d.collection(TRACKS);
   const toHit = (r: Document, ranks: Hit["ranks"] = {}): Hit => ({
@@ -72,9 +92,13 @@ export async function findTrack(venueArg: unknown, qArg: unknown, modeArg?: unkn
   });
 
   // The product answer: meaning (Vector Search). Words (Atlas Search) only if Voyage is unavailable.
-  const answer = (await tracks.aggregate([...(meaning ?? words), { $limit: 5 }, project]).toArray()).map((r) => toHit(r));
+  const rows = await tracks.aggregate([...(meaning ?? words), { $limit: 5 }, project]).toArray();
+  const texts = new Map(rows.map((r) => [String(r._id), `${r.title}. ${r.genre}. ${r.descriptor}`]));
+  const vectorAnswer = rows.map((r) => toHit(r));
+  const reranked = meaning && (rerankOn() || modeArg === "compare") ? await rerank(q, vectorAnswer, texts) : null;
+  const answer = rerankOn() && reranked ? reranked : vectorAnswer;
   const out: Record<string, unknown> = {
-    q, venueId: all ? "all" : venueArg, by: meaning ? "meaning" : "words", voyage: Boolean(vector), ms: Date.now() - t0,
+    q, venueId: all ? "all" : venueArg, by: meaning ? (rerankOn() && reranked ? "meaning, reranked" : "meaning") : "words", voyage: Boolean(vector), ms: Date.now() - t0,
     results: answer,
     note: vector ? null : "Voyage AI was unavailable, so this search matched words only.",
   };
@@ -96,6 +120,7 @@ export async function findTrack(venueArg: unknown, qArg: unknown, modeArg?: unkn
     });
     out.words = (await tracks.aggregate([...words, project]).toArray()).map((r) => toHit(r));
     out.meaning = meaning ? (await tracks.aggregate([...meaning, project]).toArray()).map((r) => toHit(r)) : [];
+    out.reranked = reranked ?? [];
   }
   return out;
 }
