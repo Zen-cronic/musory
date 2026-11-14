@@ -1,8 +1,8 @@
 # Musory
 
-**Bars play one playlist for everyone, and the apps that let guests shape the music keep their likes on view with no easy way to take them back.**
+**Venues play one playlist for everyone, and the apps that let guests shape the music keep their likes on view with no easy way to take them back.**
 
-**Your bar learns what its crowd likes and makes music for it. One tap makes every venue forget you.**
+**Your venue learns what its crowd likes and makes music for it. One tap makes every venue forget you.**
 
 Bars and clubs play one playlist for everyone. I love electronic music. Not everyone does.
 
