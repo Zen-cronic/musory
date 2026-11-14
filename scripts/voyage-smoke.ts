@@ -89,6 +89,6 @@ check("V2 after forget the clip URL is 404", after === 404, { status: after });
 check("V2 after forget the clip is not findable", !again.results.some((h: any) => h.clipId === clipId.toHexString()), again.results.map((h: any) => h.trackId));
 check("no copy of the guest id or the words anywhere", (await docsContaining(personId)) + (await docsContaining(words)) === 0, { id: await docsContaining(personId), words: await docsContaining(words) });
 if (await d.collection(DERIVED).findOne({ _id: clipId })) await d.collection(DERIVED).deleteOne({ _id: clipId });
-console.log(failures ? `${failures} check(s) failed` : "voyage smoke: all checks passed");
+console.log(failures ? `${failures} ${failures === 1 ? "check" : "checks"} failed` : "voyage smoke: all checks passed");
 await closeAll();
 process.exit(failures ? 1 : 0);

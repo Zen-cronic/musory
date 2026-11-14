@@ -1170,6 +1170,7 @@ export async function proof(name: string, personId?: string) {
   throw fail(404, "Unknown proof");
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 /** The headline number, recomputed on demand. */
 export async function headline() {
   const d = await db();
@@ -1200,8 +1201,8 @@ export async function headline() {
     includesSimulated: simulated > 0,
     sentence:
       (simulated > 0 ? "Tonight, including simulated guests: " : "") +
-      `${changed} of ${withMemory.length} picks tonight differ from the no-memory pick. ` +
-      `${tombstones.length} guest(s) said forget me: ${leftovers} records left, and ${checks.filter((c) => c.matchesWithoutYou).length} of ${checks.length} room picks match the pick without them.`,
+      `${changed} of ${plural(withMemory.length, "pick")} tonight ${withMemory.length === 1 ? "differs" : "differ"} from the no-memory pick. ` +
+      `${plural(tombstones.length, "guest")} said forget me: ${plural(leftovers, "record")} left, and ${checks.filter((c) => c.matchesWithoutYou).length} of ${plural(checks.length, "room pick")} ${checks.length === 1 ? "matches" : "match"} the pick without them.`,
   };
 }
 

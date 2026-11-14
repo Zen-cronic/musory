@@ -118,7 +118,7 @@ else {
     await variant("erase", "strict");
     await variant("erase-committed", "strict");
   }
-  console.log(failures ? `${failures} check(s) failed` : "forget graph smoke: all checks passed");
+  console.log(failures ? `${failures} ${failures === 1 ? "check" : "checks"} failed` : "forget graph smoke: all checks passed");
   await closeAll();
   process.exit(failures ? 1 : 0);
 }
