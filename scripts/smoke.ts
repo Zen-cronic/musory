@@ -18,6 +18,12 @@ async function api(path: string, body?: unknown): Promise<any> {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const room = (v: string) => api(`/api/room/${v}`);
 
+// Wait until the server has finished starting (tracks loaded, change streams on, rooms playing).
+for (let i = 0; i < 60; i++) {
+  const h = await fetch(BASE + "/api/health").then((r) => r.json()).catch(() => null);
+  if (h?.ready) break;
+  await sleep(500);
+}
 await api("/api/film/reset", {});
 const guest = `smoke-${Date.now() % 1_000_000}`;
 

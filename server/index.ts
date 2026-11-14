@@ -178,7 +178,8 @@ app.post("/api/volunteer", wrap(async (req) => {
   return { label: guestLabel(String(pick.personId)) };
 }));
 app.post("/api/stage/simulate", wrap(async (req) => simulateGuests(venueOf(req.body?.venueId ?? "copper"), req.body?.genre ? String(req.body.genre) : undefined)));
-app.get("/api/health", (_req, res) => res.json({ ok: true, clients: clientCount(), rooms: VENUE_IDS.map((v) => ({ v, play: rooms[v].play?.trackId })) }));
+let ready = false; // true once tracks are loaded, change streams are on and the rooms are playing
+app.get("/api/health", (_req, res) => res.json({ ok: true, ready, clients: clientCount(), rooms: VENUE_IDS.map((v) => ({ v, play: rooms[v].play?.trackId })) }));
 
 // Change streams: rooms and screens are driven by what the database commits.
 async function watch() {
@@ -240,6 +241,7 @@ app.listen(port, host, async () => {
     console.log("change streams on");
     const d = await db();
     startPlayer();
+    ready = true;
     if (forgetGraphOn()) void resumePending();
     if (!(await d.collection(PLAYS).countDocuments({}))) await resetAndSeed();
     console.log("rooms playing");
