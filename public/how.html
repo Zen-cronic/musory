@@ -115,7 +115,7 @@
 import { api, events, $, genreName, refusalTicket, progress } from "/js/common.js";
 import { params, settle } from "/js/look.js";
 const only = params.get("venue");
-const names = { copper: "Copper Room", basement: "Basement 2" };
+const names = { copper: "Copper Bar", basement: "Basement Club" };
 const mine = (e) => !only || !e.venueId || e.venueId === only;
 function light(id) { const n = $(id); n.classList.add("lit"); clearTimeout(n._t); n._t = setTimeout(() => n.classList.remove("lit"), 2600); }
 function vectorSearch(e) {
