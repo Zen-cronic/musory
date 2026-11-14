@@ -14,13 +14,24 @@ Bars and clubs play one playlist for everyone. I love electronic music. Not ever
 
 ## What forget me does
 
-One tap deletes your likes, your taste and any track made from them, at every venue, in one transaction.
-Afterwards 0 records about you are left, and each room plays the track it said it would play without you. `GET /api/number` recomputes this live, and `pnpm smoke` checks it end to end.
+One tap deletes your likes and taste at every venue in one transaction. Crowd memory is rebuilt without them, and our copies of tracks made from them are deleted.
+Afterwards the checked collections hold 0 records with your guest id, and the room chooses without your taste. `GET /api/number` recomputes this live, and `pnpm smoke` checks it end to end. Backups, the oplog, the text-free receipt and copies the music provider keeps are outside that zero.
 
 ![How Musory works: the guest's phone, the server, MongoDB Atlas and the room screens](docs/architecture.png)
 
 - **Watch the 1-minute video:** [VIDEO URL]
 - **Try it:** watch the 1-minute video to see it.
+
+## Screens
+
+| | |
+|---|---|
+| ![The landing page](docs/gallery/1-landing.webp) | ![The room screen at rest](docs/gallery/2-room.webp) |
+| The landing page. | The room screen: now playing, the next track with memory, and how to check in. |
+| ![The room making a new track](docs/gallery/3-room-making.webp) | ![The stage screen](docs/gallery/6-stage.webp) |
+| The room makes a new track when the crowd moves it. | The stage screen for a projector: check in, and how many people shape the music. |
+| ![How it works, live](docs/gallery/7-how.webp) | <img src="docs/gallery/4-phone.webp" alt="The guest page" width="45%"> <img src="docs/gallery/5-forget-receipt.webp" alt="The forget me receipt" width="45%"> |
+| How it works, live: each box lights up when its step runs. | The guest page, and the receipt after forget me. |
 
 ## What it does
 
@@ -29,10 +40,10 @@ Afterwards 0 records about you are left, and each room plays the track it said i
 - **Your night** on the guest page lists what the room played while you were checked in, from the room's own play log: no microphone, no song recognition.
 - **Your taste is yours.** It goes with you to any venue you check into, so there's no cold start, and a venue uses it only while you're there.
 - **Each venue's crowd memory is private.** Copper Bar can't read Pulse Club's, and neither can read your raw taps. Atlas refuses (error 13).
-- **Forget me** deletes your taste, your taps, your check-ins, and your share of every venue's crowd memory, in one transaction. The receipt shows the count going to 0, and both rooms re-pick and play the track they said they'd play without you.
-- **The room makes a new track when the crowd moves it.** When guests' taps change a room's leading sound, the room asks ElevenLabs Music for a new 15-second track at its current tempo (a composition plan that eases from the current sound into the new one) and crossfades into it over about 3 seconds, with filter sweeps. The screen says "Making a new track for the N people…", then "Made just now for this room". If the new track takes more than 10 seconds, the room plays the closest track from its catalogue and says so.
+- **Forget me** deletes your taste, your taps, your check-ins, and your share of every venue's crowd memory, in one transaction. The receipt shows the count going to 0, and both rooms choose again without your taste.
+- **The room makes a new track when the crowd moves it.** When guests' taps change a room's leading sound, the room asks ElevenLabs Music for a new 15-second track at its current tempo (a composition plan that eases from the current sound into the new one) and crossfades into it over about 3 seconds, with filter sweeps. The screen says "Making a new track from this room's shared taste", then "Made just now for this room". If the new track takes more than 10 seconds, the room plays the closest track from its catalogue and says so.
 
-Venues (Copper Bar, Pulse Club), guests and track titles are fictional. The music is 19 instrumental clips we generated with ElevenLabs Music from descriptions of genre, tempo and sound only.
+Venues (Copper Bar, Pulse Club), guests and track titles are fictional. The catalogue is 19 instrumental clips generated with ElevenLabs Music from descriptions of genre, tempo and sound only.
 
 ## How the next track is picked
 
@@ -41,10 +52,10 @@ No model picks the track. The server blends three layers of memory into one quer
 | Layer | What it is | Owner | Weight in the query |
 |---|---|---|---|
 | Guests' taste | Each checked-in guest's taste vector, built only from their own taps. Anyone who just checked in or tapped in the last 2 minutes counts 3 times | The guest | 60% |
-| Crowd memory | This venue's reactions from guests who agreed, as one aggregate of 3 or more people, with no names or ids | The venue | 25% |
+| Crowd memory | This venue's reactions from guests who agreed, as one aggregate of 3 or more people. Crowd records hold no guest ids. Source tap ids let us remove your share and are hidden from venue logins | The venue | 25% |
 | The current track | Keeps the set moving smoothly | | 15% |
 
-The search is exact (`$vectorSearch` with `exact: true`), pre-filtered on the hour's energy and a BPM range around the current track, and skips anything played recently. Every pick is stored with the pick the same search makes with no memory (the current track alone), so "memory changed the pick" is computed, not claimed.
+The search is exact (`$vectorSearch` with `exact: true`), pre-filtered on the demo clock's energy target and a BPM range around the current track, and skips anything played recently. Every pick is stored with the pick the same search makes with no memory (the current track alone), so "memory changed the pick" is computed, not claimed.
 
 ## The three questions, answered by the database
 
@@ -58,22 +69,22 @@ Other rules the database enforces (`validationLevel: "constraint"`, error 121 ot
 - A venue's crowd memory needs at least 3 different people. With fewer, only the pick is kept.
 - A guest's taste can be built only from that guest's own taps.
 - Venue memory (crowd memory, decisions, notes) can't hold a guest's id.
-- One reaction per guest per track (unique index, E11000).
-- Taps live at most 180 days (TTL index); check-ins and tonight-only sessions expire too.
+- One reaction per guest per play (unique index, E11000).
+- Taps get an expiry no later than 180 days after they are made. TTL removes expired records asynchronously, and check-ins and tonight-only sessions expire too.
 
 ## Everything lives in MongoDB
 
-Tracks made from guests' taste are stored inside MongoDB, so forget me deletes the sound itself in the same transaction, and closing time deletes it automatically (a TTL index on the clip records, which Atlas runs about once a minute). The 19 catalogue clips are stored there too, each in its track document; `GET /api/audio/<id>` streams every sound from Atlas, and only the shared catalogue clips may be cached.
+Tracks made from guests' taste are stored inside MongoDB, so forget me deletes the sound itself in the same transaction, and closing time deletes it automatically (a TTL index on the clip records, which Atlas runs asynchronously, usually within a minute or two). The 19 catalogue clips are stored there too, each in its track document; `GET /api/audio/<id>` streams every sound from Atlas, and only the shared catalogue clips may be cached.
 
 ## How fast it is (measured on the Atlas sandbox, 2026-11-14)
 
 - A guest checks in and their taste changes the room: the room plays a track made for it about 4 seconds later (ElevenLabs takes about 2.5 seconds of that).
 - Five simulated guests tap a new sound: a new track made for the room is playing about 6 seconds later.
-- Forget me: the room crossfades to the track it promised without the guest about 2.3 seconds after the request, and the full receipt arrives about a second later, once the pick has been recomputed from what is left in the database. With the durable follow-up checks on (they run after the room has changed), it was about 2.5 seconds.
+- Forget me: the room crossfades to a track chosen without the guest about 2.3 seconds after the request, and the full receipt arrives about a second later, once the pick has been recomputed from what is left in the database. With the durable follow-up checks on (they run after the room has changed), it was about 2.5 seconds.
 
 ## "What was that track?"
 
-A guest can type a few words about something they heard ("dark rolling bassline, fast") and get the track back. The words are embedded with Voyage and matched against the clips' descriptions with Atlas Vector Search, then the top results are reordered by Voyage's reranker (`rerank-3`, through the Voyage API). In a test with 20 descriptions we wrote, the right track came first 18 times with the reranker, 17 times without it, and 11 times with keyword search or with `$rankFusion` combining keyword and vector search, so the hybrid search is not used. That was the only alternative we tried, with no tuning. Turn it on with `FIND_TRACK=1` (and `FIND_RERANK=1` for the reranker).
+A guest can type a few words about something they heard ("dark rolling bassline, fast") and get the track back. The words are embedded with Voyage and matched against the clips' descriptions with Atlas Vector Search, then the top results are reordered by Voyage's reranker (`rerank-3`, through the Voyage API). In a test with 20 descriptions we wrote, the right track came first 18 times with the reranker, 17 times without it, and 11 times with keyword search or with `$rankFusion` combining keyword and vector search, so the hybrid search is not used. That was the only alternative we tried, with no tuning. The reranker orders catalogue matches. When tracks made for the room are mixed in, results are ordered by vector score. Turn it on with `FIND_TRACK=1` (and `FIND_RERANK=1` for the reranker).
 
 ## Checks that run on their own
 
@@ -82,20 +93,27 @@ A guest can type a few words about something they heard ("dark rolling bassline,
 
 ## How forget me reaches every copy
 
-Crowd memory holds no identities, so how does forget me find your share? Each crowd memory document lists the tap ids it was built from (`derivedFrom`), and taps belong to the guest. Forget me starts at your taps and runs `$graphLookup` over `derivedFrom`: depth 0 finds your taste and every venue's crowd memory you fed; depth 1 finds the decisions built from those. In one transaction it deletes your taps, taste, check-ins, consents, tonight sessions and bored records, rebuilds each crowd memory from the taps that remain (removing it if fewer than 3 people are left), unlinks your taste from past decisions, and writes a text-free receipt (an HMAC of your id plus counts). Then both rooms re-pick and play the new pick at once.
+Crowd memory holds no identities, so how does forget me find your share? Each crowd memory document lists the tap ids it was built from (`derivedFrom`), and taps belong to the guest. Forget me starts at your taps and runs `$graphLookup` over `derivedFrom`: depth 0 finds your taste and every venue's crowd memory you fed. Past picks are not deleted: the transaction removes your taste's reference from them. In one transaction it deletes your taps, taste, check-ins, consents, tonight sessions and bored records, rebuilds each crowd memory from the taps that remain (removing it if fewer than 3 people are left), unlinks your taste from past decisions, and writes a text-free receipt (an HMAC of your id plus counts). Then both rooms re-pick and play the new pick at once.
 
-## Sponsor technology
+## Sponsor tech, and what each one does
 
-| Product | What it does here |
-|---|---|
-| MongoDB Atlas (Cluster0, MongoDB 9.0) | The system of record: taps, taste, crowd memory, decisions, plays |
-| Atlas change streams | Drive the room screens: a new play or decision in the database is what moves the screen and the music |
-| Atlas Vector Search | Picks every next track: `$vectorSearch` (exact) with the blended memory as the query and energy and BPM pre-filters |
-| Atlas transactions + `$graphLookup` | Forget me, bored of this and undo, across every venue in one commit |
-| Atlas schema validation (`constraint`), unique and TTL indexes | The 121 and E11000 refusals; expiry of taps, check-ins and tonight sessions |
-| Atlas database users + Views | One login per venue; the 13 refusals |
-| Voyage AI (`voyage-4`) | Embeds each clip's text description (genre, tempo, energy, sound) |
-| ElevenLabs Music | Generated the 19-clip catalogue (`music_v2`), and composes new tracks live (`music_v2_5`, composition plan) when the crowd's taps move a room to a new sound |
+| Sponsor | Product | What it does in Musory | Where |
+|---|---|---|---|
+| MongoDB | Atlas (system of record) | Keeps every tap, taste, crowd memory, pick and play | `server/db.ts`, `server/room.ts` |
+| MongoDB | Atlas Vector Search | Chooses the next catalogue track and the fallback: an exact `$vectorSearch` with the room's blend (guest taste, venue memory and the current track) as the query. ElevenLabs can compose the next track instead. Also finds "What was that track?" from a guest's own words | `server/room.ts`, `server/find.ts` |
+| MongoDB | Atlas Search index | Keyword search over track titles and descriptions, kept as the comparison for "What was that track?" | `server/find.ts`, `scripts/setup-vector.ts` |
+| MongoDB | Change streams | Move the room screens: a new pick or play saved in Atlas is what changes the screen and the music | `server/index.ts` |
+| MongoDB | Database users and Views | One login per venue. A venue can read only its own crowd memory, never another venue's or any guest's taps (refused with 13) | `scripts/setup-db.ts` |
+| MongoDB | Schema validation | Atlas enforces the stored memory rules (the app checks consent and supplies the source fields). It refuses memory that breaks a rule, such as a crowd memory from fewer than 3 people or a tonight-only like saved as long-term taste (refused with 121) | `scripts/setup-db.ts` |
+| MongoDB | Unique index | One reaction per guest per play (refused with E11000) | `scripts/setup-db.ts` |
+| MongoDB | TTL indexes | Taps get an expiry no later than 180 days, check-ins and tonight-only sessions expire, and tracks made for a room expire at closing. TTL removes them asynchronously | `scripts/setup-db.ts`, `server/expiry.ts` |
+| MongoDB | Transactions and `$graphLookup` | Forget me follows what was built from a guest's taps: one commit deletes their records and the clips made from them, rebuilds crowd memory, and removes their taste's reference from past picks | `server/room.ts` |
+| MongoDB | Audio in documents | Every track, including the ones made for a room, is stored in Atlas, so the forget me transaction deletes our audio bytes with the clip record | `server/index.ts`, `server/music.ts` |
+| Voyage AI | `voyage-4` | Turns each track's written description, and a guest's own words, into vectors. Catalogue embeddings are cached in Atlas | `server/embed.ts`, `server/find.ts` |
+| Voyage AI | `rerank-3` (Voyage API) | Re-orders the top 5 catalogue matches for "What was that track?" (right track first in 18 of 20 test descriptions, 17 without it). Mixed catalogue and new-track results use vector scores | `server/find.ts` |
+| ElevenLabs | Music (`music_v2_5`) | Makes a new 15-second track from the room's shared taste when the crowd's taps move it, from genre, tempo and texture words only. The 19 catalogue clips were also made with ElevenLabs Music | `server/music.ts` |
+| LangChain | LangSmith evaluations | Scripted scenarios run against the real server with plain-code checks: 9 of 9 uploaded scenarios passed (no trace of a forgotten guest in the checked collections, and each room chose without them). Result: [LANGSMITH RESULT LINK] | `scripts/eval.ts` |
+| LangChain | LangGraph with the MongoDB checkpointer | Forget is one transaction. Its follow-up verification runs as a LangGraph job checkpointed in Atlas and can resume after a restart once saved | `server/forget-graph.ts` |
 
 ## Run it
 
@@ -118,10 +136,10 @@ pnpm smoke                # end-to-end checks against the running server
 
 ## What's simulated and what isn't
 
-- **Real:** every sound streams from Atlas. Every database rule, refusal, transaction, change stream and vector search above runs live on Atlas. The clips are real ElevenLabs Music generations. The embeddings are real Voyage calls (cached on disk so a reset doesn't spend the rate limit).
+- **Real:** every sound streams from Atlas. Every database rule, refusal, transaction, change stream and vector search above runs live on Atlas. The clips are real ElevenLabs Music generations. The embeddings are real Voyage calls. Catalogue embeddings are cached in Atlas, and the words a guest types are not stored by our app.
 - **Simulated:** the venues, their regulars from "last weekend" and the guests are seeded. A **Simulated guests** button makes five seeded guests like two samples of one sound, so the room can be shown without phones; it is labelled as simulated on screen. The time of night is a demo clock ("Next hour"). Clips are 15 seconds, so a room's set moves fast. "Tonight only" lasts 2 minutes in the demo.
 - **Not built:** real venue sound systems or DJ software; the room plays clips in a browser. Transitions are crossfades (1 second between catalogue tracks, about 3 seconds with filter sweeps into a new track), not beat-matched mixing.
-- **Limits we know about:** Atlas backups and the oplog keep data for their own retention windows; the validator checks what the server writes onto a document (it trusts the copied owner ids). TTL expiry runs about once a minute, not instantly. A pick reveals a little about who is in the room. Live composition sends ElevenLabs only genre, tempo and texture words from the room's blend, never anything about a guest. A composed track's record keeps the room's mix, the number of people behind it (3 or more) and the tap ids it was built from, so forget me deletes it and its file; copies ElevenLabs keeps under its own terms are outside this app's reach. Live composition is capped at 60 tracks a day and one per room every 20 seconds.
+- **Limits we know about:** Atlas backups and the oplog keep data for their own retention windows; the validator checks what the server writes onto a document (it trusts the copied owner ids). TTL expiry runs asynchronously, not instantly. A pick reveals a little about who is in the room. Live composition sends ElevenLabs only genre, tempo and texture words from the room's blend, never anything about a guest. A composed track's record keeps the room's mix, the number of people behind it (3 or more) and the tap ids it was built from, so the forget me transaction deletes our audio bytes with the clip record; copies ElevenLabs keeps under its own terms are outside this app's reach. The demo process limits generation attempts in memory, so the limit resets on restart. The normal cooldown between new tracks has exceptions for the stage button and for a guest's typed vibe.
 
 ## Prior art
 
