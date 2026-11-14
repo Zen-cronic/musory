@@ -51,13 +51,20 @@ footer { border-top: 2px solid #1C2D38; padding: 36px 0 40px; }
 :focus-visible { outline: 3px solid var(--band); outline-offset: 3px; }
 
 /* Hero story, 10 s loop: likes join the crowd, the room makes a track, forget me sends it back. */
-.hero { overflow-x: clip; } .stage { position: relative; aspect-ratio: 1 / 1.02; width: 100%; max-width: 560px; justify-self: end; }
+.hero { overflow-x: clip; } .stage { position: relative; aspect-ratio: 1 / 1; width: 112%; max-width: 640px; justify-self: center; --R: 270px; }
+.orb { position: absolute; left: 50%; top: 64%; width: 0; height: 0; }
+.orb > span { position: absolute; left: 0; top: 0; translate: -50% -50%; white-space: nowrap; }
+.vibe { display: inline-flex; padding: 9px 14px; border-radius: 16px 16px 16px 4px; background: #001E2B; color: #fff; font-weight: 700; font-size: clamp(12px, 1.3vw, 15px); box-shadow: 0 0 0 2px #00ED64; font-style: italic; }
+.tile > span { display: grid; }
+.tile { display: inline-grid; padding: 8px 12px; border-radius: 10px; background: #112733; color: #fff; box-shadow: 0 0 0 2px #B1FF05; font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: clamp(14px, 1.6vw, 18px); line-height: 1; }
+.tile small { font-weight: 600; font-stretch: 100%; text-transform: none; font-size: 11px; color: #C0FAE6; margin-top: 3px; }
+.like.no::before { background: #fff; box-shadow: 0 0 0 2px #001E2B; }
 .stage .livery { position: absolute; inset: -6% -10% -6% 30%; background: linear-gradient(105deg, transparent 0 40%, rgba(177,255,5,.9) 40% 43%, transparent 43% 46%, rgba(0,237,100,.7) 46% 48%, transparent 48%); pointer-events: none; }
-.room { position: absolute; left: 6%; right: 0; top: 8%; bottom: 14%; clip-path: var(--chamfer); background: radial-gradient(circle at 50% -190%, rgba(0,237,100,0) 66%, rgba(0,237,100,.26) 78%, rgba(177,255,5,.3) 81.5%, rgba(177,255,5,0) 84%), radial-gradient(120% 95% at 100% 0%, rgba(0,104,74,.8), rgba(0,104,74,0) 58%), linear-gradient(160deg, #034438 0%, #023430 42%, #01261F 100%); padding: 7% 7% 6%; display: flex; flex-direction: column; gap: 4%; }
+.room { position: absolute; left: 15%; right: 15%; top: 17%; bottom: 21%; clip-path: var(--chamfer); background: radial-gradient(circle at 50% -190%, rgba(0,237,100,0) 66%, rgba(0,237,100,.26) 78%, rgba(177,255,5,.3) 81.5%, rgba(177,255,5,0) 84%), radial-gradient(120% 95% at 100% 0%, rgba(0,104,74,.8), rgba(0,104,74,0) 58%), linear-gradient(160deg, #034438 0%, #023430 42%, #01261F 100%); padding: 7% 7% 6%; display: flex; flex-direction: column; gap: 4%; }
 .room .k { font-family: "JetBrains Mono", Menlo, monospace; font-size: clamp(10px, 1.1vw, 12px); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #C0FAE6; position: relative; height: 1.4em; }
 .room .k span { position: absolute; left: 0; top: 0; white-space: nowrap; }
 .titles { position: relative; height: clamp(76px, 9vw, 108px); }
-.titles b { position: absolute; left: 0; bottom: 0; font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: clamp(30px, 3.7vw, 50px); line-height: .9; white-space: nowrap; }
+.titles b { position: absolute; left: 0; bottom: 0; font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: clamp(26px, 3vw, 42px); line-height: .9; white-space: normal; right: 0; }
 .titles .sweep { position: absolute; left: 0; bottom: 0; height: 100%; width: 0; background: var(--band-bg); mix-blend-mode: normal; }
 .tag { align-self: flex-start; font-family: "JetBrains Mono", Menlo, monospace; font-weight: 700; font-size: clamp(10px, 1.1vw, 12px); text-transform: uppercase; letter-spacing: .05em; padding: 5px 9px; background: var(--band-bg); color: var(--on-band); border-radius: 999px; position: relative; }
 .taste { display: grid; gap: 7px; margin-top: auto; }
@@ -65,13 +72,13 @@ footer { border-top: 2px solid #1C2D38; padding: 36px 0 40px; }
 .taste .bar { height: 9px; background: #0B4A40; overflow: hidden; }
 .taste .bar i { display: block; height: 100%; background: #fff; }
 .taste .row.lead .bar i { background: var(--band-bg); }
-.eq { position: absolute; left: 13%; right: 6%; top: 44%; height: 16%; display: flex; align-items: end; gap: 4px; opacity: 0; }
+.eq { position: absolute; left: 21%; right: 21%; top: 46%; height: 13%; display: flex; align-items: end; gap: 4px; opacity: 0; }
 .eq i { flex: 1; height: 100%; background: var(--band-bg); transform-origin: bottom; }
 .likes { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
-.like { position: absolute; left: 0; display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; background: #fff; color: #001E2B; font-weight: 800; font-size: clamp(12px, 1.3vw, 15px); box-shadow: 0 0 0 3px #001E2B; white-space: nowrap; }
+.like { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; background: #fff; color: #001E2B; font-weight: 800; font-size: clamp(12px, 1.3vw, 15px); box-shadow: 0 0 0 3px #001E2B; white-space: nowrap; }
 .like::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--band-bg); box-shadow: 0 0 0 2px #001E2B; }
-.forget { position: absolute; right: 4%; bottom: 2%; padding: 12px 20px; border-radius: 999px; background: var(--band-bg); color: var(--on-band); font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: clamp(16px, 1.9vw, 22px); box-shadow: 0 0 0 3px #001E2B; }
-.receipt { position: absolute; left: 6%; right: 0; top: 8%; bottom: 14%; clip-path: var(--chamfer); background: linear-gradient(160deg, #B1FF05 0%, #7DF73A 48%, #00ED64 100%); color: #001E2B; display: grid; align-content: center; padding: 0 9%; gap: 6px; opacity: 0; }
+.forget { position: absolute; left: 50%; bottom: 4%; translate: -50% 0; padding: 12px 20px; border-radius: 999px; background: var(--band-bg); color: var(--on-band); font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: clamp(16px, 1.9vw, 22px); box-shadow: 0 0 0 3px #001E2B; }
+.receipt { position: absolute; left: 15%; right: 15%; top: 17%; bottom: 21%; clip-path: var(--chamfer); background: linear-gradient(160deg, #B1FF05 0%, #7DF73A 48%, #00ED64 100%); color: #001E2B; display: grid; align-content: center; padding: 0 9%; gap: 6px; opacity: 0; }
 .receipt .h { font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: clamp(20px, 2.6vw, 32px); }
 .receipt .count { position: relative; height: clamp(70px, 9vw, 112px); font-weight: 900; font-stretch: 75%; font-size: clamp(70px, 9vw, 112px); line-height: 1; }
 .receipt .count span { position: absolute; left: 0; top: 0; opacity: 0; }
@@ -81,7 +88,6 @@ footer { border-top: 2px solid #1C2D38; padding: 36px 0 40px; }
 
 @media (prefers-reduced-motion: no-preference) {
   .stage * { animation-duration: 10s; animation-iteration-count: infinite; animation-timing-function: cubic-bezier(.16, 1, .3, 1); animation-fill-mode: both; }
-  .like.l1 { animation-name: like1; } .like.l2 { animation-name: like2; } .like.l3 { animation-name: like3; }
   .taste .row.lead .bar i { animation-name: grow; }
   .taste .row.second .bar i { animation-name: shrink; }
   .eq { animation-name: eqshow; } .eq i { animation-name: eqbar; animation-duration: .5s; animation-timing-function: ease-in-out; animation-direction: alternate; }
@@ -96,6 +102,14 @@ footer { border-top: 2px solid #1C2D38; padding: 36px 0 40px; }
 @keyframes like1 { 0% { transform: translate(-40%, 0); opacity: 0; } 5%, 16% { transform: translate(-4%, 0); opacity: 1; } 24%, 100% { transform: translate(40%, 60px) scale(.6); opacity: 0; } }
 @keyframes like2 { 0%, 4% { transform: translate(-40%, 0); opacity: 0; } 9%, 18% { transform: translate(-2%, 0); opacity: 1; } 26%, 100% { transform: translate(40%, 30px) scale(.6); opacity: 0; } }
 @keyframes like3 { 0%, 8% { transform: translate(-40%, 0); opacity: 0; } 13%, 20% { transform: translate(-6%, 0); opacity: 1; } 28%, 100% { transform: translate(40%, 0) scale(.6); opacity: 0; } }
+@keyframes orb0 { 0%, 0.0% { transform: rotate(200deg) translateX(var(--R)) rotate(-200deg) scale(.95); opacity: 0; } 2.0% { opacity: 1; } 10.5% { opacity: 1; } 13.0%, 100% { transform: rotate(270deg) translateX(0px) rotate(-270deg) scale(.3); opacity: 0; } }
+@keyframes orb1 { 0%, 2.3% { transform: rotate(250deg) translateX(var(--R)) rotate(-250deg) scale(.95); opacity: 0; } 4.3% { opacity: 1; } 12.8% { opacity: 1; } 15.3%, 100% { transform: rotate(320deg) translateX(0px) rotate(-320deg) scale(.3); opacity: 0; } }
+@keyframes orb2 { 0%, 4.6% { transform: rotate(300deg) translateX(var(--R)) rotate(-300deg) scale(.95); opacity: 0; } 6.6% { opacity: 1; } 15.1% { opacity: 1; } 17.6%, 100% { transform: rotate(370deg) translateX(0px) rotate(-370deg) scale(.3); opacity: 0; } }
+@keyframes orb3 { 0%, 6.9% { transform: rotate(340deg) translateX(var(--R)) rotate(-340deg) scale(.95); opacity: 0; } 8.9% { opacity: 1; } 17.4% { opacity: 1; } 19.9%, 100% { transform: rotate(410deg) translateX(0px) rotate(-410deg) scale(.3); opacity: 0; } }
+@keyframes orb4 { 0%, 9.2% { transform: rotate(30deg) translateX(var(--R)) rotate(-30deg) scale(.95); opacity: 0; } 11.2% { opacity: 1; } 19.7% { opacity: 1; } 22.2%, 100% { transform: rotate(100deg) translateX(0px) rotate(-100deg) scale(.3); opacity: 0; } }
+@keyframes orb5 { 0%, 11.5% { transform: rotate(80deg) translateX(var(--R)) rotate(-80deg) scale(.95); opacity: 0; } 13.5% { opacity: 1; } 22.0% { opacity: 1; } 24.5%, 100% { transform: rotate(150deg) translateX(0px) rotate(-150deg) scale(.3); opacity: 0; } }
+@keyframes orb6 { 0%, 13.8% { transform: rotate(130deg) translateX(var(--R)) rotate(-130deg) scale(.95); opacity: 0; } 15.8% { opacity: 1; } 24.3% { opacity: 1; } 26.8%, 100% { transform: rotate(200deg) translateX(0px) rotate(-200deg) scale(.3); opacity: 0; } }
+@keyframes orb7 { 0%, 16.1% { transform: rotate(165deg) translateX(var(--R)) rotate(-165deg) scale(.95); opacity: 0; } 18.1% { opacity: 1; } 26.6% { opacity: 1; } 29.1%, 100% { transform: rotate(235deg) translateX(0px) rotate(-235deg) scale(.3); opacity: 0; } }
 @keyframes grow { 0%, 20% { width: 30%; } 30%, 62% { width: 82%; } 72%, 100% { width: 30%; } }
 @keyframes shrink { 0%, 20% { width: 58%; } 30%, 62% { width: 34%; } 72%, 100% { width: 58%; } }
 @keyframes eqshow { 0%, 30% { opacity: 0; } 33%, 46% { opacity: 1; } 49%, 100% { opacity: 0; } }
@@ -117,10 +131,11 @@ footer { border-top: 2px solid #1C2D38; padding: 36px 0 40px; }
 @keyframes c4 { 0%, 70% { opacity: 0; } 70.5%, 100% { opacity: 1; } }
 /* Reduced motion: the settled end of the story, shown at once */
 @media (prefers-reduced-motion: reduce) {
-  .like, .eq, .receipt, .forget, .tag.made, .titles .t2, .titles .sweep, .k .k2, .k .k3 { display: none; }
+  .orb, .eq, .receipt, .forget, .tag.made, .titles .t2, .titles .sweep, .k .k2, .k .k3 { display: none; }
   .tag.without { opacity: 1; }
 }
-@media (max-width: 900px) { .stage { justify-self: stretch; max-width: none; margin-top: 8px; } }
+@media (max-width: 900px) { .stage { justify-self: center; max-width: 520px; margin-top: 8px; --R: 36vw; } .room, .receipt { left: 11%; right: 11%; } .eq { left: 17%; right: 17%; } }
+.orb { animation-timing-function: cubic-bezier(.45, .05, .35, 1) !important; }
 
 @media (max-width: 900px) { .hero { grid-template-columns: 1fr; padding-top: 16px; } .steps { grid-template-columns: 1fr; } .cols { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .cols { grid-template-columns: 1fr; } .top .btn { display: none; } .ctas .btn { width: 100%; } }
@@ -150,7 +165,7 @@ footer { border-top: 2px solid #1C2D38; padding: 36px 0 40px; }
         </div>
         <div class="eq"><i style="animation-delay:-0s"></i><i style="animation-delay:-0.2s"></i><i style="animation-delay:-0.35s"></i><i style="animation-delay:-0.1s"></i><i style="animation-delay:-0.4s"></i><i style="animation-delay:-0.25s"></i><i style="animation-delay:-0.05s"></i><i style="animation-delay:-0.3s"></i><i style="animation-delay:-0.15s"></i><i style="animation-delay:-0.45s"></i><i style="animation-delay:-0.2s"></i><i style="animation-delay:-0.38s"></i><i style="animation-delay:-0.08s"></i><i style="animation-delay:-0.28s"></i><i style="animation-delay:-0.12s"></i><i style="animation-delay:-0.42s"></i><i style="animation-delay:-0.18s"></i><i style="animation-delay:-0.33s"></i></div>
         <div class="receipt"><span class="h">Forget me</span><div class="count"><span class="c1">21</span><span class="c2">14</span><span class="c3">7</span><span class="c4">0</span></div><p>records about you, deleted at every venue</p></div>
-        <div class="likes"><span class="like l1" style="top:47%">I like this: techno, 132 BPM</span><span class="like l2" style="top:57%">I like this: techno, 128 BPM</span><span class="like l3" style="top:67%">I like this: minimal, 128 BPM</span></div>
+        <div class="orb" style="animation-name:orb0"><span class="like">I like this: techno, 132 BPM</span></div><div class="orb" style="animation-name:orb1"><span class="vibe">Something dark and driving</span></div><div class="orb" style="animation-name:orb2"><span class="tile"><span>Hand Stamp<small>Afro house, 122 BPM</small></span></span></div><div class="orb" style="animation-name:orb3"><span class="like">I like this: afro house, 122 BPM</span></div><div class="orb" style="animation-name:orb4"><span class="like no">Not for me: disco</span></div><div class="orb" style="animation-name:orb5"><span class="vibe">More bass, less vocals</span></div><div class="orb" style="animation-name:orb6"><span class="tile"><span>Low Ceiling<small>Minimal techno, 128 BPM</small></span></span></div><div class="orb" style="animation-name:orb7"><span class="like">I like this: techno, 128 BPM</span></div>
         <span class="forget">Forget me</span>
       </div>
     </section>
