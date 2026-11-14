@@ -1,4 +1,4 @@
-// The catalogue: 21 instrumental clips we generated with ElevenLabs Music (15 s each).
+// The catalogue: 19 instrumental clips we generated with ElevenLabs Music (15 s each).
 // Titles are fictional. Each description is the prompt the clip was generated from:
 // genre, tempo and texture only, never an artist, title or label name.
 export type Track = {
@@ -18,8 +18,6 @@ const t = (n: number, title: string, genre: string, bpm: number, energy: number,
 
 export const TRACKS: Track[] = [
   t(1, "Copper Wire", "house", 124, 0.72, "Upbeat melodic house, 124 BPM, warm pads, rolling bassline, crisp hi-hats, festival energy"),
-  t(2, "Second Room", "house", 124, 0.7, "Upbeat melodic house, 124 BPM, warm pads, rolling bassline, crisp hi-hats, festival energy, a looser groove"),
-  t(3, "Cloakroom 14", "house", 124, 0.7, "Melodic house, 124 BPM, warm pads, rolling bassline, crisp hi-hats, open and bright"),
   t(4, "Upstairs Bar", "house", 124, 0.68, "Melodic house, 124 BPM, soft pads, round rolling bassline, crisp hi-hats, friendly early-night energy"),
   t(5, "Smoke Machine", "deep house", 120, 0.5, "Deep house, 120 BPM, smoky Rhodes chords, round warm bassline, soft shuffled hi-hats, late-night lounge"),
   t(6, "Hand Stamp", "afro house", 122, 0.7, "Afro house, 122 BPM, warm melodic pads, layered afro-house percussion, congas, shakers, talking drum and log drum groove"),
@@ -42,4 +40,6 @@ export const TRACKS: Track[] = [
 
 export const GENRES = [...new Set(TRACKS.map((x) => x.genre))];
 export const byId = new Map(TRACKS.map((x) => [x._id, x]));
-export const embedText = (x: Track) => `${x.genre}. ${x.descriptor}`;
+const energyWord = (e: number) => (e >= 0.85 ? "peak-time, high energy" : e >= 0.7 ? "dancefloor energy" : e >= 0.5 ? "mid-energy groove" : "low energy, warm-up");
+/** The text Voyage embeds for each clip: genre, tempo band and energy first, then the clip's own description. */
+export const embedText = (x: Track) => `Genre: ${x.genre}. Tempo: ${x.bpm} BPM. Energy: ${energyWord(x.energy)}. Sound: ${x.descriptor}.`;

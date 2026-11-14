@@ -37,6 +37,7 @@ function showPlay(play) {
   t.textContent = play.title;
   t.dataset.trackId = play.trackId;
   $("now-meta").textContent = `${play.genre} · ${play.bpm} BPM · ${play.trackId}`;
+  $("now-why").textContent = play.memoryChangedPick && play.baselinePick ? `Picked from the room's memory. With no memory it would be ${play.baselinePick.title} (${play.baselinePick.genre}).` : "";
   progress($("now-progress"), play);
   crossfade(play.audio);
   console.log("now-playing", JSON.stringify({ trackId: play.trackId, at: Date.now() }));

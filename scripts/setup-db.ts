@@ -163,6 +163,7 @@ async function main() {
   // The catalogue, embedded with Voyage from each clip's text description.
   const vectors = await embedSeed(TRACKS.map(embedText));
   if (!vectors) throw new Error("Voyage embedding failed; check VOYAGE_API_KEY");
+  await d.collection(TRACKS_COLL).deleteMany({ _id: { $nin: TRACKS.map((t) => t._id) } as never });
   for (const [i, tr] of TRACKS.entries())
     await d.collection(TRACKS_COLL).replaceOne({ _id: tr._id as never }, { ...tr, embedding: vectors[i] }, { upsert: true });
   console.log("tracks embedded:", TRACKS.length, "dims:", vectors[0].length);

@@ -1,0 +1,95 @@
+export {};
+// End-to-end checks against the running server (default http://localhost:4377).
+// Every claim in the README's proof table is one of these checks.
+const BASE = process.env.BASE || "http://localhost:4377";
+let pass = 0;
+let fail = 0;
+const results: string[] = [];
+function check(name: string, ok: boolean, detail = "") {
+  if (ok) pass++;
+  else fail++;
+  results.push(`${ok ? "PASS" : "FAIL"} ${name}${detail ? ` (${detail})` : ""}`);
+}
+async function api(path: string, body?: unknown): Promise<any> {
+  const r = await fetch(BASE + path, body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  return { status: r.status, ...j };
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const room = (v: string) => api(`/api/room/${v}`);
+
+await api("/api/film/reset", {});
+const guest = `smoke-${Date.now() % 1_000_000}`;
+
+// 1. Check in with consent, then taps change the pick against the no-memory pick.
+const c = await api("/api/checkin", { personId: guest, venueId: "copper", scopes: ["use_taste", "contribute_crowd"] });
+check("check in at Copper Room with consent", c.venueId === "copper" && c.consents?.[0]?.scopes?.length === 2);
+await api("/api/tap", { personId: guest, signal: 1, trackId: "t17" });
+await api("/api/tap", { personId: guest, signal: 1, trackId: "t18" });
+const dup = await api("/api/tap", { personId: guest, signal: 1, trackId: "t17" });
+check("a second like on the same track is refused (E11000)", dup.already === true);
+await sleep(2500);
+let r = await room("copper");
+// Either the room already moved to the guest's sound (the play records what the no-memory pick was),
+// or the next pick differs from the no-memory pick.
+const moved = r.play?.memoryChangedPick === true || r.next?.memoryChangedPick === true;
+check("the taps change Copper Room's pick vs the no-memory pick", moved, `playing ${r.play?.title} (no memory: ${r.play?.baselinePick?.title ?? "-"}), next ${r.next?.picked?.title} (no memory: ${r.next?.baselinePick?.title})`);
+const tap = (await api(`/api/me?personId=${guest}`)).taps?.[0];
+check("the tap is saved with track, venue and time", Boolean(tap?.trackId && tap?.venueId === "copper" && tap?.at));
+
+// 2. Taste carries to Basement 2 at once.
+const before = (await room("basement")).next;
+await api("/api/checkin", { personId: guest, venueId: "basement" });
+r = await room("basement");
+check("taste applies at Basement 2 immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
+
+// 3. Bored of this: likes superseded, then undo.
+const pre = await api(`/api/me?personId=${guest}`);
+const playing = (await room("basement")).play?.genre;
+const b = await api("/api/bored", { personId: guest });
+check("bored of this runs (superseded or nothing to set aside)", b.status === 200, `${b.superseded} ${b.genre} likes, playing ${playing}`);
+if (b.superseded) {
+  const u = await api("/api/bored/undo", { personId: guest, prefId: b.prefId });
+  check("undo restores the superseded likes", u.restored === b.superseded);
+}
+void pre;
+
+// 4. Tonight only: tonight taps never enter long-term taste unless kept (121).
+await api("/api/tonight/start", { personId: guest });
+await api("/api/tap", { personId: guest, signal: 1 });
+const leak = await api("/api/proof/tonight-leak", { personId: guest });
+check("a tonight-only tap can't enter long-term taste (121)", leak.ok === false && leak.error?.code === 121);
+await api("/api/tonight/end", { personId: guest });
+
+// 5. Venue isolation and venue memory rules.
+const cross = await api("/api/proof/cross-venue", {});
+check("Basement 2's login can't read Copper Room's crowd memory (13)", cross.ok === false && cross.error?.code === 13);
+const own = await api("/api/proof/own-venue", {});
+check("Copper Room's login reads its own crowd memory", own.ok === true);
+const raw = await api("/api/proof/venue-reads-taps", {});
+check("a venue login can't read guests' raw taps (13)", raw.ok === false && raw.error?.code === 13);
+const under3 = await api("/api/proof/crowd-under-3", {});
+check("crowd memory from fewer than 3 people is refused (121)", under3.ok === false && under3.error?.code === 121);
+const others = await api("/api/proof/others-taps", {});
+check("taste built from someone else's taps is refused (121)", others.ok === false && others.error?.code === 121);
+const ident = await api("/api/proof/identity-in-venue", {});
+check("a guest id in venue memory is refused (121)", ident.ok === false && ident.error?.code === 121);
+
+// 6. Forget me: N -> 0, every venue's crowd memory rebuilt, the room plays the pick without them.
+const w = await api(`/api/without?personId=${guest}`);
+const f = await api("/api/forget", { personId: guest });
+check("forget me removes every record (N -> 0)", f.totalBefore > 0 && f.totalAfter === 0, `${f.totalBefore} -> ${f.totalAfter}, txn ${f.txnMs} ms`);
+check("forget me removed the guest's share from both venues' crowd memory", (f.venues ?? []).filter((v: any) => v.contributionRemoved).length === 2);
+await sleep(500);
+for (const v of ["copper", "basement"]) {
+  const now = (await room(v)).play?.trackId;
+  const promised = (f.venues ?? []).find((x: any) => x.venueId === v)?.pickWithoutYou?.trackId;
+  const preview = (w.venues ?? []).find((x: any) => x.venueId === v)?.withoutYou?.trackId;
+  check(`${v}: now playing the pick without them`, Boolean(now && now === promised), `${now} vs ${promised}; preview ${preview}`);
+}
+const n = await api("/api/number");
+check("the headline number recomputes with 0 records left", n.recordsLeftForForgottenGuests === 0 && n.forgotten >= 1, n.sentence);
+
+console.log(results.join("\n"));
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);

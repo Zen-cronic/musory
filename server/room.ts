@@ -421,7 +421,11 @@ async function runRefresh(venueId: VenueId) {
 }
 
 // The player: each room plays its latest pick when the current clip ends
-type Play = { playId: string; trackId: string; startedAt: number; endsAt: number };
+type Play = {
+  playId: string; trackId: string; startedAt: number; endsAt: number;
+  // The decision that chose this track: did memory change it, and what would have played with no memory.
+  memoryChangedPick: boolean; baselinePick: { trackId: string; title: string; genre: string } | null;
+};
 export const rooms: Record<VenueId, { play: Play | null; next: Document | null }> = {
   copper: { play: null, next: null },
   basement: { play: null, next: null },
@@ -432,7 +436,12 @@ export async function advance(venueId: VenueId) {
   const trackId: string = r.next?.picked?.trackId ?? (venueId === "copper" ? "t01" : "t11");
   const now = Date.now();
   const playId = new ObjectId().toHexString();
-  r.play = { playId, trackId, startedAt: now, endsAt: now + PLAY_MS };
+  const bp = r.next?.picked?.trackId === trackId ? (r.next?.baselinePick as Candidate | null) : null;
+  r.play = {
+    playId, trackId, startedAt: now, endsAt: now + PLAY_MS,
+    memoryChangedPick: Boolean(bp && bp.trackId !== trackId),
+    baselinePick: bp ? { trackId: bp.trackId, title: bp.title, genre: bp.genre } : null,
+  };
   const d = await db();
   await d.collection(PLAYS).insertOne({
     _id: playId as never, venueId, trackId, startedAt: new Date(now), endsAt: new Date(now + PLAY_MS),
@@ -1027,9 +1036,9 @@ export async function headline() {
 
 // Reset and seed: two venues, their regulars from last weekend, one guest in each room
 const REGULARS: { id: string; venue: VenueId; likes: string[]; skips?: string[]; present?: boolean }[] = [
-  { id: "g-ben", venue: "copper", likes: ["t01", "t02", "t05", "t04"] },
+  { id: "g-ben", venue: "copper", likes: ["t01", "t04", "t05", "t07"] },
   { id: "g-carla", venue: "copper", likes: ["t06", "t08", "t09"], skips: ["t11"] },
-  { id: "g-tess", venue: "copper", likes: ["t03", "t10", "t09"] },
+  { id: "g-tess", venue: "copper", likes: ["t01", "t10", "t09"] },
   { id: "g-joel", venue: "copper", likes: ["t05", "t07", "t08"] },
   { id: "g-mark", venue: "basement", likes: ["t11", "t13", "t14"] },
   { id: "g-julie", venue: "basement", likes: ["t15", "t16", "t12"] },
@@ -1037,7 +1046,14 @@ const REGULARS: { id: string; venue: VenueId; likes: string[]; skips?: string[];
   { id: "g-ray", venue: "basement", likes: ["t14", "t12", "t16"] },
 ];
 
-export async function resetAndSeed() {
+// Resets run one at a time (two at once would collide on the unique indexes).
+let resetChain: Promise<unknown> = Promise.resolve();
+export function resetAndSeed() {
+  const run = resetChain.then(() => resetInner());
+  resetChain = run.catch(() => {});
+  return run;
+}
+async function resetInner() {
   const d = await db();
   for (const c of [TAPS, DERIVED, CONSENTS, PRESENCE, SESSIONS, PREFS, PLAYS, TOMBSTONES]) await d.collection(c).deleteMany({});
   for (const v of VENUE_IDS) {
@@ -1071,8 +1087,13 @@ export async function resetAndSeed() {
 // Demo seed: one guest, Jess, whose portable taste is techno-heavy from last weekend
 // at Basement 2. She is not checked in anywhere yet, so each scripted step lands the same way every run.
 export const FILM_GUEST = { id: "g-jess", name: "Jess" };
-export async function filmReset() {
-  await resetAndSeed();
+export function filmReset() {
+  const run = resetChain.then(() => filmInner());
+  resetChain = run.catch(() => {});
+  return run;
+}
+async function filmInner() {
+  await resetInner();
   const d = await db();
   const at0 = Date.now() - 7 * DAY + 3600_000;
   const consent = await d.collection(CONSENTS).insertOne({
