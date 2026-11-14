@@ -49,7 +49,7 @@
   <div id="ticker" hidden></div>
 </main>
 <section class="flood receipt hidden" id="receipt" data-testid="stage-receipt"></section>
-<div class="sim controls"><button id="reset" class="btn reset" title="Reset both rooms">Reset</button><button id="simulate" class="btn forget go">Simulated guests: 5 tap a new sound</button></div>
+<div class="sim controls"><button id="reset" class="btn reset" title="Reset both rooms">Reset</button><button id="simulate" class="btn forget go">Simulated guests: 5 tap a new sound</button><button id="audience" class="btn" aria-pressed="false">Audience mode: off</button><button id="their-turn" class="btn" hidden>Their turn: next typed vibe makes a track</button></div>
 <script type="module">
 import { api, events, $, genreName } from "/js/common.js";
 import { params, busy, settle, film } from "/js/look.js";
@@ -77,6 +77,16 @@ async function load() {
   next = s.next?.picked || null;
   showPlay(s.play);
 }
+// Audience mode: the crowd's typed vibes count as likes; "Their turn" lets the volunteer's next vibe make a track.
+const showAudience = (st) => {
+  $("audience").textContent = `Audience mode: ${st.audience ? "on" : "off"}`;
+  $("audience").setAttribute("aria-pressed", String(st.audience));
+  $("their-turn").hidden = !st.audience;
+  $("their-turn").textContent = st.theirTurn?.includes(venue) ? "Their turn: waiting for their vibe" : "Their turn: next typed vibe makes a track";
+};
+fetch("/api/stage/audience").then((r) => r.json()).then(showAudience).catch(() => {});
+$("audience").onclick = async () => showAudience(await api("/api/stage/audience", { on: $("audience").getAttribute("aria-pressed") !== "true" }));
+$("their-turn").onclick = async () => showAudience(await api("/api/stage/their-turn", { venueId: venue }));
 $("simulate").onclick = async () => {
   $("simulate").disabled = true;
   try { await api("/api/stage/simulate", { venueId: venue }); } catch { /* the room shows what happened */ }

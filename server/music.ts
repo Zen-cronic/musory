@@ -204,8 +204,24 @@ setComposingCheck((v) => busy.has(v));
 
 // "Tell the room what you want": the next pick in that room composes a track led by the matched catalogue track.
 const leanTo = new Map<VenueId, string>();
+// Audience mode (a whole crowd on their phones): typed vibes count as ordinary likes, and only the
+// volunteer's next vibe (marked from the stage with "their turn") makes a track at once. Crowd taps
+// can still move the room to a new track, at most one per room every 20 s, within the daily cap.
+let audience = false;
+const theirTurn = new Set<VenueId>();
+export const audienceState = () => ({ audience, theirTurn: [...theirTurn] });
+export function setAudience(on: boolean) {
+  audience = on;
+  if (!on) theirTurn.clear();
+  return audienceState();
+}
+export function markTheirTurn(venueId: VenueId) {
+  theirTurn.add(venueId);
+  return audienceState();
+}
 export function composeToward(venueId: VenueId, trackId: string) {
   if (!liveMusicOn() || !hasMusicKey()) return false;
+  if (audience && !theirTurn.delete(venueId)) return false;
   leanTo.set(venueId, trackId);
   composeSoon.add(venueId);
   return true;

@@ -141,6 +141,29 @@ for (const v of ["copper", "basement"]) {
   const preview = (w.venues ?? []).find((x: any) => x.venueId === v)?.withoutYou?.trackId;
   check(`${v}: now playing the pick without them`, Boolean(now && now === promised), `${now} vs ${promised}; preview ${preview}`);
 }
+// Audience mode: typed vibes from a crowd are ordinary likes; only "their turn" makes a track at once.
+if (cfg0.vibe && cfg0.musicLive) {
+  await api("/api/stage/audience", { on: true });
+  const crowd = ["aud-1", "aud-2", "aud-3", "aud-4", "aud-5"];
+  for (const id of crowd) await api("/api/checkin", { personId: id, venueId: "copper" });
+  const from = streamed.length;
+  const vs = await Promise.all(crowd.map((id) => api("/api/vibe", { personId: id, text: "warm disco strings" })));
+  await sleep(6000);
+  const makings = streamed.slice(from).filter((e) => e.type === "music_making" && e.data.venueId === "copper").length;
+  check("audience mode: 5 typed vibes count as likes and make at most 1 track", vs.every((v) => v.status === 200 && !v.making) && makings <= 1, `${makings} track(s) started`);
+  await sleep(1100);
+  await api("/api/stage/their-turn", { venueId: "copper" });
+  const from2 = streamed.length;
+  const tv = await api("/api/vibe", { personId: "aud-1", text: "hard fast techno" });
+  let made = false;
+  for (let i = 0; i < 40 && !made; i++) {
+    await sleep(250);
+    made = streamed.slice(from2).some((e) => e.type === "music_making" && e.data.venueId === "copper");
+  }
+  check("audience mode: the volunteer's vibe after \"their turn\" makes a track at once", tv.making === true && made);
+  await api("/api/stage/audience", { on: false });
+  for (const id of crowd) await api("/api/forget", { personId: id });
+}
 // Room controls refuse anything that looks like it came through the public link, however the path is spelled.
 for (const p of ["/api/reset", "/API/RESET", "/api/reset/", "/api/stage/simulate"]) {
   const r = await fetch(BASE + p, { method: "POST", headers: { "content-type": "application/json", "x-musory-public": "1" }, body: "{}" });
