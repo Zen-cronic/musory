@@ -272,8 +272,9 @@ export type RoomQuery = {
   derivedFrom: ObjectId[];
 };
 
-async function roomQuery(venueId: VenueId, opts: { excludePerson?: string; crowd?: CrowdCalc | null } = {}): Promise<RoomQuery> {
-  const nowTrack = catalogueId(rooms[venueId].play?.trackId ?? "t01");
+type PickOpts = { excludePerson?: string; crowd?: CrowdCalc | null; nowTrack?: string; exclude?: string[] };
+async function roomQuery(venueId: VenueId, opts: PickOpts = {}): Promise<RoomQuery> {
+  const nowTrack = opts.nowTrack ?? catalogueId(rooms[venueId].play?.trackId ?? "t01");
   const crowdDocP = opts.crowd !== undefined || opts.excludePerson ? null : db().then((d) => d.collection(DERIVED).findOne({ kind: "crowd", venueId }));
   const { present, guests } = await guestsIn(venueId, opts.excludePerson);
   let crowdVec: number[] | null = null;
@@ -359,9 +360,10 @@ async function vectorSearch(queryVector: number[], exclude: string[], nowBpm: nu
   return rows.map((r) => ({ trackId: String(r._id), title: r.title, genre: r.genre, bpm: r.bpm, score: Math.round(r.score * 10000) / 10000 }));
 }
 
-export async function computePick(venueId: VenueId, opts: { excludePerson?: string; crowd?: CrowdCalc | null } = {}) {
-  const [q, exclude] = await Promise.all([roomQuery(venueId, opts), recentlyPlayed(venueId)]);
-  const nowTrack = catalogueId(rooms[venueId].play?.trackId ?? "t01");
+export async function computePick(venueId: VenueId, opts: PickOpts = {}) {
+  const [q, recent] = await Promise.all([roomQuery(venueId, opts), opts.exclude ? Promise.resolve([...opts.exclude]) : recentlyPlayed(venueId)]);
+  const exclude = recent;
+  const nowTrack = opts.nowTrack ?? catalogueId(rooms[venueId].play?.trackId ?? "t01");
   if (!exclude.includes(nowTrack)) exclude.push(nowTrack);
   const bpm = byId.get(nowTrack)?.bpm ?? 124;
   const [candidates, baseline] = await Promise.all([vectorSearch(q.vector, exclude, bpm), vectorSearch(vec.get(nowTrack)!, exclude, bpm, 3)]);
@@ -844,7 +846,16 @@ export async function withoutYou(personId: string) {
 
 async function forgetInner(personId: string) {
   const d = await db();
-  const before = await countFor(personId);
+  const tStart = Date.now();
+  const beforeP = countFor(personId);
+  // Each room's state the promise is made against: the track playing now and what it played recently.
+  const ctx: Partial<Record<VenueId, { nowTrack: string; exclude: string[] }>> = {};
+  await Promise.all(VENUE_IDS.map(async (v) => {
+    const nowTrack = catalogueId(rooms[v].play?.trackId ?? "t01");
+    const exclude = await recentlyPlayed(v);
+    if (!exclude.includes(nowTrack)) exclude.push(nowTrack);
+    ctx[v] = { nowTrack, exclude };
+  }));
   // What each room would pick if this guest had never been here: computed before anything is deleted.
   const counterfactual: Partial<Record<VenueId, Candidate | null>> = {};
   const pickBefore: Partial<Record<VenueId, Candidate | null>> = {};
@@ -856,13 +867,15 @@ async function forgetInner(personId: string) {
       pickBefore[v] = (rooms[v].next?.picked as Candidate) ?? null;
       const [crowd, cf] = await Promise.all([
         d.collection(DERIVED).findOne({ kind: "crowd", venueId: v }, { projection: { distinctContributors: 1, weights: 1 } }),
-        computePick(v, { excludePerson: personId }),
+        computePick(v, { excludePerson: personId, ...ctx[v] }),
       ]);
       crowdBefore[v] = (crowd?.distinctContributors as number) ?? 0;
       mixBefore[v] = (crowd?.weights as Record<string, number>) ?? null;
       counterfactual[v] = cf.candidates[0] ?? null;
     }),
   );
+  const before = await beforeP;
+  const cfMs = Date.now() - tStart;
   const c = await client("app");
   let graph: { depth0: number; depth1: number; venues: string[] } = { depth0: 0, depth1: 0, venues: [] };
   let clipIds: ObjectId[] = [];
@@ -932,11 +945,26 @@ async function forgetInner(personId: string) {
     for (const [k, m] of genClips) if (m.clipId === hex) genClips.delete(k);
     for (const v of VENUE_IDS) if (rooms[v].queued?.clipId === hex) rooms[v].queued = undefined;
   }
-  // Both rooms re-pick from the committed data and play the new pick now.
-  const [after] = await Promise.all([countFor(personId), ...VENUE_IDS.map((v) => afterAction(v, true))]);
+  // Both rooms play the promised "without you" pick right away. In parallel, the pick is recomputed from
+  // what is now in the database (same now-track, same recent plays) to check the promise held.
+  const tPlay = Date.now();
+  await Promise.all(VENUE_IDS.map(async (v) => {
+    const cf = counterfactual[v];
+    if (!cf) return;
+    rooms[v].queued = undefined;
+    rooms[v].next = { ...(rooms[v].next ?? {}), picked: cf, baselinePick: rooms[v].next?.baselinePick ?? null };
+    await advance(v);
+  }));
+  const roomChangeMs = Date.now() - tStart;
+  const [after, ...checks] = await Promise.all([
+    countFor(personId),
+    ...VENUE_IDS.map((v) => computePick(v, ctx[v])),
+  ]);
+  const verifyMs = Date.now() - tPlay;
   const venues = [];
-  for (const v of VENUE_IDS) {
-    const now = rooms[v].play ? (byId.get(rooms[v].play!.trackId) ? { ...byId.get(rooms[v].play!.trackId)!, trackId: rooms[v].play!.trackId } : null) : null;
+  for (const [i, v] of VENUE_IDS.entries()) {
+    const fromDb = checks[i]?.candidates[0];
+    const now = fromDb ?? null;
     venues.push({
       venueId: v,
       venue: VENUES[v].name,
@@ -948,11 +976,16 @@ async function forgetInner(personId: string) {
       contributionRemoved: graph.venues.includes(v),
       pickBefore: pickBefore[v] ? { trackId: pickBefore[v]!.trackId, title: pickBefore[v]!.title, genre: pickBefore[v]!.genre } : null,
       pickAfter: now ? { trackId: now.trackId, title: now.title, genre: now.genre } : null,
+      nowPlaying: rooms[v].play?.trackId ?? null,
       pickWithoutYou: counterfactual[v] ? { trackId: counterfactual[v]!.trackId, title: counterfactual[v]!.title, genre: counterfactual[v]!.genre } : null,
       matchesWithoutYou: Boolean(now && counterfactual[v] && now.trackId === counterfactual[v]!.trackId),
     });
   }
-  const receipt = { before: before.counts, totalBefore: before.total, totalAfter: after.total, graph, composedClipsRemoved: clipIds.length, txnMs, venues, at: new Date() };
+  const receipt = {
+    before: before.counts, totalBefore: before.total, totalAfter: after.total, graph, composedClipsRemoved: clipIds.length, txnMs,
+    timing: { counterfactualMs: cfMs, txnMs, roomChangeMs, verifyMs, totalMs: Date.now() - tStart }, venues, at: new Date(),
+  };
+  for (const v of VENUE_IDS) void scheduleRefresh(v, 0);
   await d.collection(TOMBSTONES).updateOne({ hmac: hmac(personId) }, { $set: { venues: venues.map((v) => ({ venueId: v.venueId, matchesWithoutYou: v.matchesWithoutYou })) } });
   emit("txn", { op: "forget_me", counts: { ...before.counts, total: before.total, after: after.total }, graph, ms: txnMs });
   emit("forgotten", { label: guestLabel(personId), ...receipt });
