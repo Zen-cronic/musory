@@ -127,11 +127,12 @@ check("a catalogue track's sound streams from Atlas", cat.status === 200 && cat.
 // With live music on: Jess checks in, the room makes a track from her taste, and forget me deletes its sound.
 const cfg = await api("/api/config");
 if (cfg.musicLive) {
+  const from = streamed.length;
   await api("/api/checkin", { personId: "g-jess", venueId: "copper" });
   let made: any = null;
   for (let i = 0; i < 30 && !made; i++) {
     await sleep(500);
-    made = streamed.find((e) => e.type === "play" && e.data.venueId === "copper" && e.data.play?.composed);
+    made = streamed.slice(from).find((e) => e.type === "play" && e.data.venueId === "copper" && e.data.play?.composed);
   }
   const url = made?.data.play.audio as string | undefined;
   const got = url ? await fetch(BASE + url) : null;
