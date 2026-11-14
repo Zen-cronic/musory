@@ -1,6 +1,6 @@
 // Stage-mode load test: N guests check in to one room and tap, while we watch the room's event stream.
 // Reports the p50/p95 time from a tap being sent to the room's next pick arriving over SSE.
-// Run against a server started with STAGE=1. Resets the rooms at the end unless --keep.
+// Run against a server started with STAGE=1. Removes the load guests at the end unless --keep (no room reset).
 export {};
 const BASE = process.env.BASE || "http://localhost:4377";
 const N = Number(process.env.LOAD_N || 200);
@@ -73,7 +73,7 @@ const lat = taps.filter((t) => t.status === 200).map((t) => {
 console.log(`tap -> room update: p50 ${pct(lat, 50)} ms, p95 ${pct(lat, 95)} ms, max ${Math.max(...lat)} ms (${lat.length}/${taps.length} matched, ${nextEvents.length} room picks)`);
 ac.abort();
 if (!process.argv.includes("--keep")) {
-  const r = await post("/api/reset", {});
-  console.log("rooms reset:", r.status);
+  const r = await post("/api/stage/clear-load", {});
+  console.log("load guests removed:", r.status);
 }
 process.exit(0);

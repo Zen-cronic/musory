@@ -10,7 +10,7 @@ import { subscribe, emit, recentEvents, clientCount } from "./events.js";
 import {
   HttpError, fail, loadTracks, startPlayer, resetAndSeed, roomState, me, personOf, checkin, checkout, tap, bored, undoBored,
   startTonight, endTonight, keepTonightTap, forget, proof, headline, nextHour, clockState, advance, playView, rooms, guestLabel,
-  emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset, guestTag, STAGE, simulateGuests, dropQueuedClip,
+  emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset, guestTag, STAGE, simulateGuests, dropQueuedClip, clearLoadGuests,
 } from "./room.js";
 import { generateFromRoom, hasMusicKey, liveMusicOn, musicState } from "./music.js";
 import { forgetGraphOn, runForgetGraph, resumePending } from "./forget-graph.js";
@@ -58,8 +58,9 @@ function lanIp(): string | null {
   return null;
 }
 /** The address phones should open: a public URL when deployed, the laptop's LAN address in LAN mode. */
+let publicBase = process.env.PUBLIC_BASE_URL || "";
 function baseUrl(req: express.Request): string {
-  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, "");
+  if (publicBase) return publicBase.replace(/\/$/, "");
   if (LAN) {
     const ip = lanIp();
     if (ip) return `http://${ip}:${port}`;
@@ -177,6 +178,14 @@ app.post("/api/volunteer", wrap(async (req) => {
   emit("volunteer", { venueId: v, tag: guestTag(String(pick.personId)), label: guestLabel(String(pick.personId)) });
   return { label: guestLabel(String(pick.personId)) };
 }));
+// Point the QR codes at a public URL (e.g. a tunnel) without a restart. Local screen only (see the lock).
+app.post("/api/stage/base-url", wrap(async (req) => {
+  const url = String(req.body?.url ?? "");
+  if (url && !/^https:\/\/[a-z0-9.-]+(:\d+)?\/?$/i.test(url)) throw fail(400, "Expected an https origin, like https://example.trycloudflare.com");
+  publicBase = url;
+  return { baseUrl: publicBase || null };
+}));
+app.post("/api/stage/clear-load", wrap(async () => clearLoadGuests()));
 app.post("/api/stage/simulate", wrap(async (req) => simulateGuests(venueOf(req.body?.venueId ?? "copper"), req.body?.genre ? String(req.body.genre) : undefined)));
 let ready = false; // true once tracks are loaded, change streams are on and the rooms are playing
 app.get("/api/health", (_req, res) => res.json({ ok: true, ready, clients: clientCount(), rooms: VENUE_IDS.map((v) => ({ v, play: rooms[v].play?.trackId })) }));

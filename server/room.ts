@@ -1277,3 +1277,22 @@ export async function simulateGuests(venueId: VenueId, genre?: string) {
   void refreshNow(venueId).then(() => afterAction(venueId)).catch(() => {});
   return { venueId, guests: ids.length, genre: target, taps: docs.length };
 }
+
+/** Load tests: remove every record of guests whose id starts with "load-", rebuild crowd memory, re-pick. */
+export async function clearLoadGuests() {
+  const d = await db();
+  const q = { personId: { $regex: /^load-/ } };
+  const taps = await d.collection(TAPS).deleteMany(q);
+  await Promise.all([
+    d.collection(CONSENTS).deleteMany(q),
+    d.collection(PRESENCE).deleteMany(q),
+    d.collection(SESSIONS).deleteMany(q),
+    d.collection(PREFS).deleteMany(q),
+    d.collection(DERIVED).deleteMany({ kind: "taste", ownerId: { $regex: /^load-/ } }),
+  ]);
+  for (const v of VENUE_IDS) {
+    await refreshNow(v);
+    void emitPresence(v);
+  }
+  return { tapsRemoved: taps.deletedCount };
+}
