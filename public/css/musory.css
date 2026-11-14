@@ -54,6 +54,8 @@
 html { -webkit-text-size-adjust: 100%; }
 body { background: var(--bg); background-image: var(--field, none); background-attachment: fixed; color: var(--on-bg); font-family: var(--f-body); font-size: var(--s-3); line-height: 1.4; }
 button { font: inherit; color: inherit; cursor: pointer; }
+p, h1, h2, h3, small, .why, .note { text-wrap: pretty; }
+.display { text-wrap: balance; }
 a { color: inherit; }
 [hidden], .hidden { display: none !important; }
 :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }

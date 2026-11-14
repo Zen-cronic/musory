@@ -196,7 +196,7 @@ function sameQuery(before, after, who) {
   const el = $("same-count");
   el.innerHTML = `${before}<span class="count-arrow"></span>${after}${UNDER}`;
   el.classList.add("marked");
-  $("same-text").textContent = `Records about ${who} after forget me`;
+  $("same-text").textContent = `Records left about ${who}`;
 }
 
 function showReceipt(r) {
@@ -263,7 +263,7 @@ async function load() {
   showNext(s.next);
   showMemory(s.memory);
   const n = await api("/api/number").catch(() => null);
-  if (n && n.forgotten) { $("same-count").textContent = String(n.recordsLeftForForgottenGuests ?? 0); $("same-text").textContent = `Records left about the ${n.forgotten} ${n.forgotten === 1 ? "guest" : "guests"} who said forget me`; }
+  if (n && n.forgotten) { $("same-count").textContent = String(n.recordsLeftForForgottenGuests ?? 0); $("same-text").textContent = "Records left after forget me"; }
   settle();
 }
 function setQr() {
