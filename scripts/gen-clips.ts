@@ -23,7 +23,7 @@ async function gen(id: string, prompt: string) {
   const r = await fetch("https://api.elevenlabs.io/v1/music", {
     method: "POST",
     headers: { "xi-api-key": String(process.env.ELEVENLABS_API_KEY), "content-type": "application/json", accept: "audio/mpeg" },
-    body: JSON.stringify({ prompt, music_length_ms: 15000, model_id: "music_v2", force_instrumental: true }),
+    body: JSON.stringify({ prompt, music_length_ms: 15000, model_id: "music_v2_5", force_instrumental: true }),
   });
   if (!r.ok) return console.log(id, "failed HTTP", r.status, (await r.text()).slice(0, 200));
   writeFileSync(out, Buffer.from(await r.arrayBuffer()));

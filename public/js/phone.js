@@ -4,7 +4,9 @@ const params = new URLSearchParams(location.search);
 const parts = location.pathname.split("/").filter(Boolean);
 // /join/<venue>, /join?venue=<venue>&as=<guest>, /p/<guest>, /me
 const pathVenue = parts[0] === "join" ? parts[1] : null;
-const wantVenue = pathVenue || params.get("venue");
+// The venue this page is for: the QR code's venue at first, then wherever the guest checks in.
+let wantVenue = pathVenue || params.get("venue");
+let switching = false; // while moving venues, a late reply about the old venue must not bring back the check-in sheet
 const asGuest = parts[0] === "p" ? parts[1] : params.get("as");
 function personId() {
   if (asGuest) return asGuest;
@@ -17,6 +19,11 @@ function personId() {
   return id;
 }
 const pid = personId();
+function guestTag(id) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, "0");
+}
 let state = null;
 let cfg = null;
 let lastPref = null;
@@ -27,9 +34,10 @@ function render(m) {
   $("guest-label").textContent = m.label;
   const here = m.venueId;
   const target = wantVenue || here;
-  const needsCheckin = target && here !== target;
+  const needsCheckin = target && here !== target && !switching;
   $("consent").classList.toggle("hidden", !needsCheckin);
   $("main").classList.toggle("hidden", needsCheckin || !here);
+  $("forget-section").classList.toggle("hidden", !(here || m.taste || (m.taps || []).length));
   $("venue-name").textContent = here ? m.venue : venueName(target) || "Musory";
   $("consent-venue").textContent = venueName(target);
   if (!here && !target) { $("venue-name").textContent = "Scan a venue's QR code"; }
@@ -72,10 +80,11 @@ const act = (fn) => async () => {
 $("checkin").onclick = act(async () => {
   const scopes = [$("scope-taste").checked && "use_taste", $("scope-crowd").checked && "contribute_crowd"].filter(Boolean);
   render(await api("/api/checkin", { personId: pid, venueId: wantVenue || state?.venueId, scopes }));
+  wantVenue = state.venueId;
   toast(`Checked in at ${state.venue}.`);
 });
-$("like").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: 1 }); render(r.me); toast(r.message); });
-$("skip").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: -1 }); render(r.me); toast(r.message); });
+$("like").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: 1 }); if (r.me) render(r.me); toast(r.message); });
+$("skip").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: -1 }); if (r.me) render(r.me); toast(r.message); });
 $("bored").onclick = act(async () => {
   const r = await api("/api/bored", { personId: pid });
   render(r.me);
@@ -86,7 +95,14 @@ $("undo").onclick = act(async () => { const r = await api("/api/bored/undo", { p
 $("tonight").onclick = act(async () => render(await api(state?.tonight ? "/api/tonight/end" : "/api/tonight/start", { personId: pid })));
 $("switch-venue").onclick = act(async () => {
   const other = state.venueId === "copper" ? "basement" : "copper";
-  render(await api("/api/checkin", { personId: pid, venueId: other, scopes: ["use_taste", "contribute_crowd"] }));
+  wantVenue = other;
+  switching = true;
+  try {
+    render(await api("/api/checkin", { personId: pid, venueId: other, scopes: ["use_taste", "contribute_crowd"] }));
+  } finally {
+    switching = false;
+  }
+  render(state);
   history.replaceState(null, "", asGuest ? location.pathname + location.search.replace(/venue=\w+/, `venue=${other}`) : `/join/${other}`);
   toast(`Checked in at ${state.venue}. Your taste came with you.`);
 });
@@ -96,12 +112,13 @@ $("forget-no").onclick = () => $("forget-confirm").classList.add("hidden");
 async function doForget() {
   const r = await api("/api/forget", { personId: pid });
   $("main").classList.add("hidden");
+  $("forget-section").classList.add("hidden");
   $("volunteer").classList.add("hidden");
   $("consent").classList.add("hidden");
   const el = $("receipt");
   const rooms = r.venues.filter((v) => v.contributionRemoved).length;
   el.innerHTML = `<div class="label">Forgotten</div>
-    <h2 class="big" style="font-size:26px">Removed your share from ${rooms} room${rooms === 1 ? "" : "s"}' crowd memory.</h2>
+    <h2 class="big" style="font-size:26px">Removed your share from ${rooms === 1 ? "1 room's" : `${rooms} rooms'`} crowd memory.</h2>
     <div class="count" id="receipt-count">${r.totalBefore} → ${r.totalAfter}</div>
     <div>records about you, in one database transaction.</div>
     ${r.venues.map((v) => `<div style="margin-top:8px" data-venue="${v.venueId}"><b>${v.venue}</b>: ${v.contributionRemoved ? `crowd memory ${v.crowdContributorsBefore} → ${v.crowdContributorsAfter} people${v.crowdMemoryKept ? "" : " (not enough people, so it was removed)"}` : "none of your taps were in its crowd memory"}. Now playing <b>${v.pickAfter?.title ?? "–"}</b>${v.matchesWithoutYou ? ", the track it said it would play without you" : ""}.</div>`).join("")}
@@ -113,7 +130,7 @@ $("forget-big").onclick = act(doForget);
 
 events({
   play: (e) => { if (state && e.venueId === state.venueId) showPlay(e.play); },
-  volunteer: (e) => { if (e.personId === pid) { $("volunteer").classList.remove("hidden"); window.scrollTo(0, 0); } },
+  volunteer: (e) => { if (e.tag === guestTag(pid)) { $("volunteer").classList.remove("hidden"); window.scrollTo(0, 0); } },
   reset: async () => render(await api(`/api/me?personId=${pid}`)),
 });
 async function samples() {
@@ -121,7 +138,7 @@ async function samples() {
   $("samples").innerHTML = list.map((t) => `<button data-sample="${t.trackId}">${t.genre}</button>`).join("");
   document.querySelectorAll("[data-sample]").forEach((b) => (b.onclick = act(async () => {
     const r = await api("/api/tap", { personId: pid, signal: 1, trackId: b.dataset.sample });
-    render(r.me);
+    if (r.me) render(r.me);
     toast(r.already ? "Already counted." : `Saved: you like ${b.textContent}.`);
   })));
 }

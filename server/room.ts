@@ -3,6 +3,9 @@
 // blended from the guests in the room, the venue's crowd memory and the current track.
 import { ObjectId, type ClientSession, type Document } from "mongodb";
 import { createHmac } from "node:crypto";
+import { rmSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   client, db, redactError, loginName, isVenue,
   TRACKS, TAPS, DERIVED, CONSENTS, PRESENCE, SESSIONS, PREFS, PLAYS, TOMBSTONES,
@@ -12,11 +15,15 @@ import { TRACKS as CATALOG, byId, GENRES } from "./catalog.js";
 import { emit } from "./events.js";
 
 const DAY = 86_400_000;
+const GEN_DIR = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."), "public", "audio", "gen");
 const PLAY_MS = Number(process.env.PLAY_MS || 15_000); // each clip is 15 s
 const TONIGHT_MS = Number(process.env.TONIGHT_MS || 120_000); // demo clock for "tonight only"
 const RECENT_TAP_MS = 120_000; // guests who just arrived or reacted in the last 2 minutes count 3x in the room blend
 const TONIGHT_WINDOW_MS = 6 * 3600_000; // taps from tonight count 2x in a venue's crowd memory
 export const W = { taste: 0.6, crowd: 0.25, now: 0.15 };
+// Stage mode: the whole audience is the crowd. Tastes are rebuilt in batches and rooms re-pick at most every 2 s.
+export const STAGE = process.env.STAGE === "1";
+const dirtyTastes = new Set<string>();
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -114,6 +121,31 @@ export async function rebuildTaste(personId: string, session?: ClientSession) {
   };
   await coll.replaceOne({ kind: "taste", ownerId: personId }, doc, { upsert: true, session });
   return doc;
+}
+
+/** Stage mode: rebuild many guests' tastes with one read and one bulk write. */
+async function rebuildTastesBatch(ids: string[]) {
+  ids.forEach((id) => dirtyTastes.delete(id));
+  if (!ids.length) return;
+  const d = await db();
+  const taps = (await d
+    .collection(TAPS)
+    .find({ personId: { $in: ids }, status: "current", $or: [{ scope: "long" }, { promotedBy: { $exists: true } }] })
+    .toArray()) as unknown as Tap[];
+  const prev = await d.collection(DERIVED).find({ kind: "taste", ownerId: { $in: ids } }, { projection: { ownerId: 1, version: 1 } }).toArray();
+  const ops = ids.map((id) => {
+    const mine = taps.filter((t) => t.personId === id);
+    const doc = {
+      kind: "taste", ownerId: id, sourceOwners: [id], derivedFrom: mine.map((t) => t._id),
+      evidence: mine.map((t) => ({ tapId: t._id, scope: t.scope, ...(t.promotedBy ? { promotedBy: t.promotedBy } : {}) })),
+      vector: vectorFromTaps(mine), weights: genreWeights(mine), likes: mine.filter((t) => t.signal > 0).length, skips: mine.filter((t) => t.signal < 0).length,
+      version: (((prev.find((p) => p.ownerId === id)?.version as number) ?? 0) + 1), at: new Date(),
+    };
+    return mine.length
+      ? { replaceOne: { filter: { kind: "taste", ownerId: id }, replacement: doc, upsert: true } }
+      : { deleteMany: { filter: { kind: "taste", ownerId: id } } };
+  });
+  await d.collection(DERIVED).bulkWrite(ops as never, { ordered: false });
 }
 
 // Crowd memory: each venue's own, private, 3+ people, no ids
@@ -241,7 +273,7 @@ export type RoomQuery = {
 };
 
 async function roomQuery(venueId: VenueId, opts: { excludePerson?: string; crowd?: CrowdCalc | null } = {}): Promise<RoomQuery> {
-  const nowTrack = rooms[venueId].play?.trackId ?? "t01";
+  const nowTrack = catalogueId(rooms[venueId].play?.trackId ?? "t01");
   const crowdDocP = opts.crowd !== undefined || opts.excludePerson ? null : db().then((d) => d.collection(DERIVED).findOne({ kind: "crowd", venueId }));
   const { present, guests } = await guestsIn(venueId, opts.excludePerson);
   let crowdVec: number[] | null = null;
@@ -329,7 +361,7 @@ async function vectorSearch(queryVector: number[], exclude: string[], nowBpm: nu
 
 export async function computePick(venueId: VenueId, opts: { excludePerson?: string; crowd?: CrowdCalc | null } = {}) {
   const [q, exclude] = await Promise.all([roomQuery(venueId, opts), recentlyPlayed(venueId)]);
-  const nowTrack = rooms[venueId].play?.trackId ?? "t01";
+  const nowTrack = catalogueId(rooms[venueId].play?.trackId ?? "t01");
   if (!exclude.includes(nowTrack)) exclude.push(nowTrack);
   const bpm = byId.get(nowTrack)?.bpm ?? 124;
   const [candidates, baseline] = await Promise.all([vectorSearch(q.vector, exclude, bpm), vectorSearch(vec.get(nowTrack)!, exclude, bpm, 3)]);
@@ -362,6 +394,11 @@ export async function decide(venueId: VenueId) {
   const d = await db();
   await d.collection(DERIVED).insertOne(decision);
   rooms[venueId].next = decision;
+  try {
+    decisionHook?.(venueId, decision);
+  } catch (e) {
+    console.error("decision hook", (e as Error).message);
+  }
   emit("vector_search", {
     venueId,
     source: "room blend",
@@ -385,7 +422,7 @@ const refreshState: Record<VenueId, { running: boolean; dirty: boolean; last: nu
   copper: { running: false, dirty: false, last: 0, waiters: [] },
   basement: { running: false, dirty: false, last: 0, waiters: [] },
 };
-const MIN_GAP_MS = Number(process.env.REFRESH_GAP_MS || 1000);
+const MIN_GAP_MS = Number(process.env.REFRESH_GAP_MS || (STAGE ? 2000 : 1000));
 
 export function scheduleRefresh(venueId: VenueId, delay?: number): Promise<void> {
   const s = refreshState[venueId];
@@ -406,6 +443,7 @@ async function runRefresh(venueId: VenueId) {
   s.running = true;
   const waiters = s.waiters.splice(0);
   try {
+    if (dirtyTastes.size) await rebuildTastesBatch([...dirtyTastes].splice(0));
     await rebuildCrowd(venueId);
     await decide(venueId);
   } catch (e) {
@@ -426,17 +464,41 @@ type Play = {
   // The decision that chose this track: did memory change it, and what would have played with no memory.
   memoryChangedPick: boolean; baselinePick: { trackId: string; title: string; genre: string } | null;
 };
-export const rooms: Record<VenueId, { play: Play | null; next: Document | null }> = {
+export type ClipMeta = { trackId: string; clipId: string; title: string; genre: string; bpm: number; audio: string; descriptor: string; anchorTrackId?: string };
+export const rooms: Record<VenueId, { play: Play | null; next: Document | null; queued?: ClipMeta }> = {
   copper: { play: null, next: null },
   basement: { play: null, next: null },
 };
+// Clips composed live by ElevenLabs Music for a room, by play track id.
+const genClips = new Map<string, ClipMeta>();
+/** Queue a composed clip to play next in a room. Taps on it count as taps on the catalogue track it was composed around. */
+export function queueClip(venueId: VenueId, meta: ClipMeta) {
+  const anchor = (rooms[venueId].next?.picked?.trackId as string) ?? rooms[venueId].play?.trackId ?? "t01";
+  const m = { ...meta, anchorTrackId: byId.has(anchor) ? anchor : "t01" };
+  genClips.set(m.trackId, m);
+  rooms[venueId].queued = m;
+}
+// Live music registers here: it hears every new pick, and tells the room when a track is being made.
+let decisionHook: ((venueId: VenueId, decision: Document) => void) | null = null;
+export const setDecisionHook = (fn: (venueId: VenueId, decision: Document) => void) => (decisionHook = fn);
+let composing: (venueId: VenueId) => boolean = () => false;
+export const setComposingCheck = (fn: (venueId: VenueId) => boolean) => (composing = fn);
+/** The leading sound of what a room is playing now. */
+export const currentGenre = (venueId: VenueId) => {
+  const id = rooms[venueId].play?.trackId ?? "";
+  return genClips.get(id)?.genre.split(" + ")[0] ?? byId.get(id)?.genre ?? "house";
+};
+/** The catalogue track behind what a room is playing (a composed clip maps to the track it was built around). */
+const catalogueId = (trackId: string) => (byId.has(trackId) ? trackId : genClips.get(trackId)?.anchorTrackId ?? "t01");
 
 export async function advance(venueId: VenueId) {
   const r = rooms[venueId];
-  const trackId: string = r.next?.picked?.trackId ?? (venueId === "copper" ? "t01" : "t11");
+  const queued = r.queued;
+  r.queued = undefined;
+  const trackId: string = queued?.trackId ?? r.next?.picked?.trackId ?? (venueId === "copper" ? "t01" : "t11");
   const now = Date.now();
   const playId = new ObjectId().toHexString();
-  const bp = r.next?.picked?.trackId === trackId ? (r.next?.baselinePick as Candidate | null) : null;
+  const bp = r.next?.picked?.trackId === trackId || queued ? (r.next?.baselinePick as Candidate | null) : null;
   r.play = {
     playId, trackId, startedAt: now, endsAt: now + PLAY_MS,
     memoryChangedPick: Boolean(bp && bp.trackId !== trackId),
@@ -468,9 +530,11 @@ export async function afterAction(venueId: VenueId, force = false) {
   if (force) await refreshNow(venueId);
   else await scheduleRefresh(venueId);
   const r = rooms[venueId];
-  const nowGenre = byId.get(r.play?.trackId ?? "")?.genre;
+  const nowGenre = byId.get(catalogueId(r.play?.trackId ?? ""))?.genre;
   const nextGenre = r.next?.picked?.genre;
   const played = Date.now() - (r.play?.startedAt ?? 0);
+  // While a new track is being made for this room, let it arrive (or the 10 s fallback fire) instead.
+  if (!force && composing(venueId)) return;
   if (force || (nextGenre && nextGenre !== nowGenre && played >= MIN_DWELL_MS)) await advance(venueId);
 }
 
@@ -497,8 +561,10 @@ export function startPlayer() {
 export const playView = (venueId: VenueId) => {
   const p = rooms[venueId].play;
   if (!p) return null;
+  const g = genClips.get(p.trackId);
+  if (g) return { ...p, title: g.title, genre: g.genre, bpm: g.bpm, audio: g.audio, descriptor: g.descriptor, composed: true, provenance: "Made just now for this room" };
   const t = byId.get(p.trackId)!;
-  return { ...p, title: t.title, genre: t.genre, bpm: t.bpm, audio: t.audio, descriptor: t.descriptor };
+  return { ...p, title: t.title, genre: t.genre, bpm: t.bpm, audio: t.audio, descriptor: t.descriptor, composed: false, provenance: "From the room's catalogue" };
 };
 
 // Guests
@@ -508,7 +574,20 @@ export function personOf(p: unknown): string {
   if (!PERSON.test(s)) throw fail(400, "Unknown guest");
   return s;
 }
+/** A short, non-reversible tag a phone can compute for its own id (FNV-1a, 32-bit). */
+export function guestTag(personId: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < personId.length; i++) {
+    h ^= personId.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+const NAMED: Record<string, string> = { "g-jess": "Jess" };
 export const guestLabel = (personId: string) => {
+  if (NAMED[personId]) return NAMED[personId];
+  const sim = /^sim-(\d+)$/.exec(personId);
+  if (sim) return `Simulated guest ${sim[1]}`;
   let h = 0;
   for (const ch of personId) h = (h * 31 + ch.charCodeAt(0)) % 90;
   return `Guest ${h + 10}`;
@@ -536,7 +615,7 @@ export async function checkin(personId: string, venueId: VenueId, scopes: string
     emitPresence(prev.venueId);
     void scheduleRefresh(prev.venueId, 0);
   }
-  await afterAction(venueId);
+  void afterAction(venueId).catch((e) => console.error("after check-in", redactError(e).message));
   return me(personId);
 }
 
@@ -557,7 +636,19 @@ export async function emitPresence(venueId: VenueId) {
 }
 
 /** A guest's reaction to the track playing now, or to a short sample they picked to start their taste. */
+const buckets = new Map<string, { tokens: number; at: number }>();
+function allowTap(personId: string) {
+  const now = Date.now();
+  const b = buckets.get(personId) ?? { tokens: 3, at: now };
+  b.tokens = Math.min(3, b.tokens + (now - b.at) / 1000);
+  b.at = now;
+  buckets.set(personId, b);
+  if (b.tokens < 1) return false;
+  b.tokens -= 1;
+  return true;
+}
 export async function tap(personId: string, signal: number, sampleTrackId?: string) {
+  if (!allowTap(personId)) throw fail(429, "One tap a second, please.");
   const d = await db();
   const pres = await d.collection(PRESENCE).findOne({ personId });
   if (!pres || !isVenue(pres.venueId)) throw fail(409, "Check in to a venue first.");
@@ -566,7 +657,7 @@ export async function tap(personId: string, signal: number, sampleTrackId?: stri
   if (!consent) throw fail(409, "Check in to a venue first.");
   const live = rooms[venueId].play;
   if (sampleTrackId && !byId.has(sampleTrackId)) throw fail(404, "Unknown track");
-  const play = sampleTrackId ? { playId: `sample-${sampleTrackId}`, trackId: sampleTrackId } : live;
+  const play = sampleTrackId ? { playId: `sample-${sampleTrackId}`, trackId: sampleTrackId } : live ? { playId: live.playId, trackId: catalogueId(live.trackId) } : null;
   if (!play) throw fail(409, "Nothing is playing yet.");
   const track = byId.get(play.trackId)!;
   const now = new Date();
@@ -585,13 +676,16 @@ export async function tap(personId: string, signal: number, sampleTrackId?: stri
     const err = redactError(e);
     if (err.code === 11000) {
       emit("refusal", { code: 11000, codeName: "DuplicateKey", venueId, where: TAPS, reason: "Already counted: one reaction per guest per track." });
-      return { already: true, message: "Already counted. One reaction per track.", me: await me(personId) };
+      return { already: true, message: "Already counted. One reaction per track.", me: STAGE ? null : await me(personId) };
     }
     throw e;
   }
-  if (doc.scope === "long") await rebuildTaste(personId);
+  if (doc.scope === "long") {
+    if (STAGE) dirtyTastes.add(personId);
+    else await rebuildTaste(personId);
+  }
   void afterAction(venueId).catch((e) => console.error("after tap", redactError(e).message));
-  return { already: false, message: signal > 0 ? `Saved: you like ${track.genre}.` : "Saved: not for you.", me: await me(personId) };
+  return { already: false, message: signal > 0 ? `Saved: you like ${track.genre}.` : "Saved: not for you.", me: STAGE ? null : await me(personId) };
 }
 
 /** "Bored of this": the guest's likes of the current genre are superseded (kept, with who and when). */
@@ -600,7 +694,7 @@ export async function bored(personId: string) {
   const pres = await d.collection(PRESENCE).findOne({ personId });
   if (!pres || !isVenue(pres.venueId)) throw fail(409, "Check in to a venue first.");
   const venueId = pres.venueId as VenueId;
-  const genre = byId.get(rooms[venueId].play?.trackId ?? "")?.genre;
+  const genre = byId.get(catalogueId(rooms[venueId].play?.trackId ?? ""))?.genre;
   if (!genre) throw fail(409, "Nothing is playing yet.");
   const c = await client("app");
   let result: Document = {};
@@ -698,14 +792,15 @@ async function countFor(personId: string, session?: ClientSession) {
   const crowdLinks = tapIds.length
     ? await d.collection(DERIVED).find({ kind: "crowd", derivedFrom: { $in: tapIds } }, { session, projection: { venueId: 1 } }).toArray()
     : [];
-  const [decisionLinks, consents, presence, sessions, prefs] = await Promise.all([
+  const [decisionLinks, consents, presence, sessions, prefs, composedClips] = await Promise.all([
     taste ? d.collection(DERIVED).countDocuments({ kind: "decision", derivedFrom: taste._id }, { session }) : 0,
     d.collection(CONSENTS).countDocuments({ personId }, { session }),
     d.collection(PRESENCE).countDocuments({ personId }, { session }),
     d.collection(SESSIONS).countDocuments({ personId }, { session }),
     d.collection(PREFS).countDocuments({ personId }, { session }),
+    tapIds.length ? d.collection(DERIVED).countDocuments({ kind: "clip", derivedFrom: { $in: tapIds } }, { session }) : 0,
   ]);
-  const counts = { taps: tapIds.length, taste: taste ? 1 : 0, consents, presence, sessions, prefs, crowdMemories: crowdLinks.length, decisionLinks };
+  const counts = { taps: tapIds.length, taste: taste ? 1 : 0, consents, presence, sessions, prefs, crowdMemories: crowdLinks.length, decisionLinks, composedClips };
   return { counts, total: Object.values(counts).reduce((s, x) => s + x, 0), crowdVenues: crowdLinks.map((c) => String(c.venueId)) };
 }
 
@@ -759,6 +854,7 @@ async function forgetInner(personId: string) {
   );
   const c = await client("app");
   let graph: { depth0: number; depth1: number; venues: string[] } = { depth0: 0, depth1: 0, venues: [] };
+  let clipIds: ObjectId[] = [];
   const crowdAfter: Partial<Record<VenueId, number>> = {};
   const t0 = Date.now();
   await c.withSession((session) =>
@@ -790,6 +886,9 @@ async function forgetInner(personId: string) {
       await d.collection(PRESENCE).deleteMany({ personId }, { session });
       await d.collection(SESSIONS).deleteMany({ personId }, { session });
       await d.collection(PREFS).deleteMany({ personId }, { session });
+      // Clips composed while this guest's taste or taps were in a room's memory: our copies go too.
+      clipIds = nodes.filter((n) => n.kind === "clip").map((n) => n._id);
+      if (clipIds.length) await d.collection(DERIVED).deleteMany({ _id: { $in: clipIds } }, { session });
       if (taste) await d.collection(DERIVED).updateMany({ kind: "decision", derivedFrom: taste._id }, { $pull: { derivedFrom: taste._id } } as never, { session });
       // Rebuild each venue's crowd memory without this guest. Below 3 people it is removed, not kept.
       for (const v of crowdVenues) {
@@ -816,6 +915,12 @@ async function forgetInner(personId: string) {
     }),
   );
   const txnMs = Date.now() - t0;
+  for (const id of clipIds) {
+    const hex = id.toHexString();
+    rmSync(path.join(GEN_DIR, `${hex}.mp3`), { force: true });
+    for (const [k, m] of genClips) if (m.clipId === hex) genClips.delete(k);
+    for (const v of VENUE_IDS) if (rooms[v].queued?.clipId === hex) rooms[v].queued = undefined;
+  }
   // Both rooms re-pick from the committed data and play the new pick now.
   const [after] = await Promise.all([countFor(personId), ...VENUE_IDS.map((v) => afterAction(v, true))]);
   const venues = [];
@@ -836,7 +941,7 @@ async function forgetInner(personId: string) {
       matchesWithoutYou: Boolean(now && counterfactual[v] && now.trackId === counterfactual[v]!.trackId),
     });
   }
-  const receipt = { before: before.counts, totalBefore: before.total, totalAfter: after.total, graph, txnMs, venues, at: new Date() };
+  const receipt = { before: before.counts, totalBefore: before.total, totalAfter: after.total, graph, composedClipsRemoved: clipIds.length, txnMs, venues, at: new Date() };
   await d.collection(TOMBSTONES).updateOne({ hmac: hmac(personId) }, { $set: { venues: venues.map((v) => ({ venueId: v.venueId, matchesWithoutYou: v.matchesWithoutYou })) } });
   emit("txn", { op: "forget_me", counts: { ...before.counts, total: before.total, after: after.total }, graph, ms: txnMs });
   emit("forgotten", { label: guestLabel(personId), ...receipt });
@@ -1110,6 +1215,54 @@ async function filmInner() {
     }),
   );
   await rebuildTaste(FILM_GUEST.id);
+  // Four more guests already in Copper Room, checked in with consent but no taps yet.
+  for (let i = 1; i <= 4; i++) await checkinQuiet(`sim-${i}`, "copper");
   await Promise.all(VENUE_IDS.map((v) => refreshNow(v)));
   return { ok: true, guest: FILM_GUEST, phone: `/p/${FILM_GUEST.id}?venue=copper`, consent: `/join?venue=copper&as=${FILM_GUEST.id}` };
+}
+
+async function checkinQuiet(personId: string, venueId: VenueId) {
+  const d = await db();
+  const now = new Date();
+  await d.collection(CONSENTS).updateOne(
+    { personId, venueId },
+    { $set: { scopes: ["use_taste", "contribute_crowd"], grantedAt: now, expiresAt: new Date(now.getTime() + 8 * 3600_000) } },
+    { upsert: true },
+  );
+  await d.collection(PRESENCE).deleteMany({ personId, venueId: { $ne: venueId } });
+  await d.collection(PRESENCE).updateOne(
+    { _id: `${venueId}|${personId}` as never },
+    { $set: { personId, venueId, since: new Date(now.getTime() - 10 * 60_000), expiresAt: new Date(now.getTime() + 3 * 3600_000) } },
+    { upsert: true },
+  );
+}
+
+/**
+ * Simulated guests (to try a room without phones): five seeded guests check in to a room and tap
+ * "I like this" on two short samples of one sound. Deterministic: same guests, same samples, same order.
+ * Default sound: disco if the room is playing something hard (techno, trance, drum & bass), otherwise techno.
+ */
+export async function simulateGuests(venueId: VenueId, genre?: string) {
+  const hard = ["techno", "trance", "drum & bass"].includes(currentGenre(venueId));
+  const target = genre && GENRES.includes(genre) ? genre : hard ? "disco" : "techno";
+  const samples = CATALOG.filter((t) => t.genre === target).slice(0, 2).map((t) => t._id);
+  const d = await db();
+  const ids = [1, 2, 3, 4, 5].map((i) => `sim-${i}`);
+  // Each simulated guest starts fresh for this sound: earlier simulated taps are cleared first.
+  await d.collection(TAPS).deleteMany({ personId: { $in: ids } });
+  for (const id of ids) await checkinQuiet(id, venueId);
+  const consents = await d.collection(CONSENTS).find({ personId: { $in: ids }, venueId }).toArray();
+  const now = Date.now();
+  const docs = ids.flatMap((id, i) =>
+    samples.map((trackId, k) => ({
+      personId: id, venueId, playId: `sample-${trackId}`, trackId, genre: target, signal: 1,
+      at: new Date(now + i * 10 + k), expiresAt: new Date(now + 180 * DAY), scope: "long", status: "current", contribute: true,
+      consentId: consents.find((c) => c.personId === id)!._id,
+    })),
+  );
+  await d.collection(TAPS).insertMany(docs);
+  await rebuildTastesBatch(ids);
+  emit("simulated", { venueId, guests: ids.length, genre: target, samples });
+  void afterAction(venueId).catch(() => {});
+  return { venueId, guests: ids.length, genre: target, taps: docs.length };
 }

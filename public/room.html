@@ -28,6 +28,7 @@
       <div class="label">Now playing <span id="now-clock" class="mono"></span></div>
       <h2 id="now-title" class="big" data-track-id="">…</h2>
       <div id="now-meta" class="mono mute">…</div>
+      <div id="now-provenance" class="label" style="color:var(--band)"></div>
       <div id="now-why" class="mute"></div>
       <div class="progress" style="margin-top:12px"><div id="now-progress"></div></div>
     </div>
@@ -37,10 +38,11 @@
       <div id="next-why" class="mute"></div>
       <div class="row" style="margin-top:10px">
         <div>With memory: <b id="with-memory" class="mono">…</b></div>
-        <div>With no memory at all: <b id="without-memory" class="mono">…</b></div>
+        <div id="without-memory-row">With no memory at all: <b id="without-memory" class="mono">…</b></div>
       </div>
       <div id="candidates" class="mono mute" style="font-size:12px;margin-top:8px"></div>
     </div>
+    <div id="making" class="card hidden" style="margin-top:16px;border-color:var(--band)"></div>
     <div class="card" style="margin-top:16px">
       <div class="label">Room mix (what the next pick is aimed at)</div>
       <div id="mix" class="bars"></div>
@@ -71,6 +73,8 @@
     <div class="row" style="margin-top:12px">
       <button id="skip">Play next now</button>
       <button id="next-hour">Next hour</button>
+      <button id="compose" class="hidden">Compose the next clip (ElevenLabs Music)</button>
+      <button id="simulate">Simulated guests: 5 tap a new sound</button>
       <button id="sound">Sound: on</button>
       <a href="/proof">Proof</a>
     </div>

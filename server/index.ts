@@ -10,9 +10,9 @@ import { subscribe, emit, recentEvents, clientCount } from "./events.js";
 import {
   HttpError, fail, loadTracks, startPlayer, resetAndSeed, roomState, me, personOf, checkin, checkout, tap, bored, undoBored,
   startTonight, endTonight, keepTonightTap, forget, proof, headline, nextHour, clockState, advance, playView, rooms, guestLabel,
-  emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset,
+  emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset, guestTag, STAGE, simulateGuests,
 } from "./room.js";
-import { generateFromRoom, hasMusicKey } from "./music.js";
+import { generateFromRoom, hasMusicKey, liveMusicOn, musicState } from "./music.js";
 import { byId } from "./catalog.js";
 
 // "Start your taste": one short sample per sound, so a new guest can say what they like in one tap.
@@ -21,6 +21,29 @@ const SAMPLES = ["t13", "t10", "t17", "t15", "t08", "t05"];
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const app = express();
 app.use(express.json({ limit: "32kb" }));
+app.set("trust proxy", "loopback");
+
+// Room and demo controls work only from the laptop itself: a request that came through a tunnel or proxy
+// (Cloudflare adds cf-ray / cf-connecting-ip; others add x-forwarded-for) or from another device is refused,
+// unless it carries the local ADMIN_TOKEN. Guest routes (check in, tap, forget me) stay open.
+const ADMIN = [
+  /^\/api\/reset$/, /^\/api\/film\//, /^\/api\/volunteer$/, /^\/api\/room\/[a-z]+\/(skip|generate|read-other)$/,
+  /^\/api\/clock\/next$/, /^\/api\/stage\//, /^\/api\/proof\//, /^\/api\/evals?\//,
+];
+const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+export function isLocalAdmin(req: express.Request): boolean {
+  const token = process.env.ADMIN_TOKEN;
+  if (token && req.get("x-admin-token") === token) return true;
+  const proxied = Boolean(req.get("cf-ray") || req.get("cf-connecting-ip") || req.get("x-forwarded-for") || req.get("forwarded"));
+  return !proxied && LOOPBACK.has(req.socket.remoteAddress ?? "");
+}
+app.use((req, res, next) => {
+  if (req.method !== "GET" && ADMIN.some((r) => r.test(req.path)) && !isLocalAdmin(req)) {
+    res.status(403).json({ error: { message: "Room controls work only on the venue's own screen." } });
+    return;
+  }
+  next();
+});
 app.use(express.static(path.join(root, "public")));
 
 const LAN = process.env.LAN === "1";
@@ -81,10 +104,12 @@ app.get("/api/recent", (_req, res) => res.json(recentEvents()));
 // Read
 app.get("/api/config", (req, res) =>
   res.json({
+    admin: isLocalAdmin(req),
     baseUrl: baseUrl(req),
     lan: LAN,
-    stage: process.env.STAGE === "1",
+    stage: STAGE,
     music: hasMusicKey(),
+    musicLive: liveMusicOn(),
     venues: VENUE_IDS.map((v) => ({ id: v, name: VENUES[v].name, view: VENUES[v].view })),
     clock: clockState(),
   }),
@@ -123,7 +148,8 @@ app.post("/api/room/:venue/skip", wrap(async (req) => {
   await advance(v);
   return { play: playView(v) };
 }));
-app.post("/api/room/:venue/generate", wrap(async (req) => generateFromRoom(venueOf(req.params.venue))));
+app.post("/api/room/:venue/generate", wrap(async (req) => generateFromRoom(venueOf(req.params.venue), { reason: "requested" })));
+app.get("/api/music", (_req, res) => res.json(musicState()));
 app.post("/api/room/:venue/read-other", wrap(async (req) => {
   const v = venueOf(req.params.venue);
   return crossVenueRead(v, v === "copper" ? "basement" : "copper");
@@ -138,9 +164,11 @@ app.post("/api/volunteer", wrap(async (req) => {
   const guests = await d.collection(PRESENCE).find({ venueId: v, personId: { $not: /^g-(ben|carla|tess|joel|mark|julie|sam|ray)$/ } }).toArray();
   if (!guests.length) throw fail(409, "No guests checked in yet.");
   const pick = guests[Math.floor(Math.random() * guests.length)];
-  emit("volunteer", { venueId: v, personId: pick.personId, label: guestLabel(String(pick.personId)) });
+  // The phone recognises itself by a short tag of its own id; the id itself never goes out.
+  emit("volunteer", { venueId: v, tag: guestTag(String(pick.personId)), label: guestLabel(String(pick.personId)) });
   return { label: guestLabel(String(pick.personId)) };
 }));
+app.post("/api/stage/simulate", wrap(async (req) => simulateGuests(venueOf(req.body?.venueId ?? "copper"), req.body?.genre ? String(req.body.genre) : undefined)));
 app.get("/api/health", (_req, res) => res.json({ ok: true, clients: clientCount(), rooms: VENUE_IDS.map((v) => ({ v, play: rooms[v].play?.trackId })) }));
 
 // Change streams: rooms and screens are driven by what the database commits.
