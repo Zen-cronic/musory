@@ -345,6 +345,7 @@ async function main() {
     measured: isFind ? Object.fromEntries(Object.entries(perSet).map(([k, v]) => [k, `n ${v.n}: words ${v.words}, meaning ${v.meaning}, hybrid ${v.hybrid}, reranked ${v.reranked}`])) : { memoryChangedPick: `${m("memory_changed_pick")?.passed ?? 0}/${m("memory_changed_pick")?.total ?? 0}`, guestChangedPick: `${m("guest_changed_pick")?.passed ?? 0}/${m("guest_changed_pick")?.total ?? 0}`, errors, forgetMsMedian: forgetTimes.sort((a, b) => a - b)[Math.floor(forgetTimes.length / 2)] ?? 0, forgetMsMax: Math.max(0, ...forgetTimes) },
     langsmith: { uploaded: upload, experiment: res.experimentName, url, dataset: upload ? name : undefined },
     sentence: upload ? sentence : `${sentence} (local run)`,
+    aborted: errors > 0,
   });
   console.log("\n" + sentence);
   if (isFind) console.log(JSON.stringify(perSet));
