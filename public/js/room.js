@@ -82,7 +82,8 @@ function crossfade(src, sweep = false) {
 function showPlay(play, { instant = false } = {}) {
   if (!play) return;
   const changed = !current || current.playId !== play.playId;
-  const sweep = Boolean(play.composed || current?.composed);
+  // After forget me the room switches at once with a short crossfade, even out of a track made for the room.
+  const sweep = play.reason !== "forget" && Boolean(play.composed || current?.composed);
   current = play;
   const slab = $("now-playing");
   const t = $("now-title");
@@ -105,8 +106,11 @@ function showPlay(play, { instant = false } = {}) {
   if (!changed || instant) { apply(); settle(); return; }
   busy(true);
   if (play.composed) endMaking();
-  t.classList.add("out");
-  setTimeout(() => { apply(); t.classList.remove("out"); }, 320);
+  if (play.reason === "forget") apply();
+  else {
+    t.classList.add("out");
+    setTimeout(() => { apply(); t.classList.remove("out"); }, 320);
+  }
   crossfade(play.audio, sweep);
   console.log("now-playing", JSON.stringify({ trackId: play.trackId, audio: play.audio, composed: Boolean(play.composed), crossfadeMs: sweep ? SWEEP_MS : CROSSFADE_MS, at: Date.now() }));
   setTimeout(() => { busy(false); settle(); }, Math.max(sweep ? SWEEP_MS : CROSSFADE_MS, 640));

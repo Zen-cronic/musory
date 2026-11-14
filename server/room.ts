@@ -463,6 +463,7 @@ type Play = {
   playId: string; trackId: string; startedAt: number; endsAt: number;
   // The decision that chose this track: did memory change it, and what would have played with no memory.
   memoryChangedPick: boolean; baselinePick: { trackId: string; title: string; genre: string } | null;
+  reason?: "forget"; // the room changed because a guest said forget me: screens switch at once, short crossfade
 };
 export type ClipMeta = { trackId: string; clipId: string; title: string; genre: string; bpm: number; audio: string; descriptor: string; anchorTrackId?: string };
 export const rooms: Record<VenueId, { play: Play | null; next: Document | null; queued?: ClipMeta }> = {
@@ -501,7 +502,7 @@ export function dropQueuedClip(clipId: string) {
 /** The catalogue track behind what a room is playing (a composed clip maps to the track it was built around). */
 const catalogueId = (trackId: string) => (byId.has(trackId) ? trackId : genClips.get(trackId)?.anchorTrackId ?? "t01");
 
-export async function advance(venueId: VenueId) {
+export async function advance(venueId: VenueId, reason?: "forget") {
   const r = rooms[venueId];
   const queued = r.queued;
   r.queued = undefined;
@@ -513,6 +514,7 @@ export async function advance(venueId: VenueId) {
     playId, trackId, startedAt: now, endsAt: now + PLAY_MS,
     memoryChangedPick: Boolean(bp && bp.trackId !== trackId),
     baselinePick: bp ? { trackId: bp.trackId, title: bp.title, genre: bp.genre } : null,
+    ...(reason ? { reason } : {}),
   };
   const d = await db();
   await d.collection(PLAYS).insertOne({
@@ -962,7 +964,7 @@ async function forgetInner(personId: string) {
     if (!cf) return;
     rooms[v].queued = undefined;
     rooms[v].next = { ...(rooms[v].next ?? {}), picked: cf, baselinePick: rooms[v].next?.baselinePick ?? null };
-    await advance(v);
+    await advance(v, "forget");
   }));
   const roomChangeMs = Date.now() - tStart;
   const [after, ...checks] = await Promise.all([

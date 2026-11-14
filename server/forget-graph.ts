@@ -83,7 +83,10 @@ async function accept(s: S): Promise<Partial<S>> {
       .aggregate([
         { $match: { personId: s.personId } },
         { $group: { _id: null, ids: { $push: "$_id" } } },
-        { $graphLookup: { from: DERIVED, startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure" } },
+        // Clips only, one level: the room's decision log (one record per pick) is never walked, so this
+        // snapshot stays fast however long the night has run.
+        { $graphLookup: { from: DERIVED, startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure", maxDepth: 0, restrictSearchWithMatch: { kind: "clip" } } },
+        { $project: { "closure._id": 1, "closure.kind": 1 } },
         { $project: { clips: { $filter: { input: "$closure", as: "n", cond: { $eq: ["$$n.kind", "clip"] } } } } },
       ])
       .toArray()
