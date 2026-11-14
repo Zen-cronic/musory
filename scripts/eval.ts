@@ -310,6 +310,9 @@ async function main() {
   let errors = 0;
   const perSet: Record<string, Record<string, number>> = {};
   const forgetTimes: number[] = [];
+  const beforeRoom: number[] = [];
+  const afterRoom: number[] = [];
+  const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? null;
   for (const row of res.results) {
     if (isFind) {
       const set = String(row.example.inputs.set);
@@ -319,6 +322,8 @@ async function main() {
     }
     if (row.run.error) errors++;
     if (typeof row.run.outputs?.forgetMs === "number") forgetTimes.push(row.run.outputs.forgetMs);
+    const du = row.run.outputs?.receipt?.durable;
+    if (du?.beforeRoomMs != null) { beforeRoom.push(du.beforeRoomMs); afterRoom.push(du.afterRoomMs); }
     let ok = !row.run.error;
     for (const r of row.evaluationResults.results) {
       const m = metrics.get(r.key) ?? { key: r.key, passed: 0, total: 0 };
@@ -342,7 +347,7 @@ async function main() {
     scenarios: picked.length,
     passed: isFind ? (m("hit_at_1_hybrid")?.passed ?? 0) : passed,
     metrics: list,
-    measured: isFind ? Object.fromEntries(Object.entries(perSet).map(([k, v]) => [k, `n ${v.n}: words ${v.words}, meaning ${v.meaning}, hybrid ${v.hybrid}, reranked ${v.reranked}`])) : { memoryChangedPick: `${m("memory_changed_pick")?.passed ?? 0}/${m("memory_changed_pick")?.total ?? 0}`, guestChangedPick: `${m("guest_changed_pick")?.passed ?? 0}/${m("guest_changed_pick")?.total ?? 0}`, errors, forgetMsMedian: forgetTimes.sort((a, b) => a - b)[Math.floor(forgetTimes.length / 2)] ?? 0, forgetMsMax: Math.max(0, ...forgetTimes) },
+    measured: isFind ? Object.fromEntries(Object.entries(perSet).map(([k, v]) => [k, `n ${v.n}: words ${v.words}, meaning ${v.meaning}, hybrid ${v.hybrid}, reranked ${v.reranked}`])) : { memoryChangedPick: `${m("memory_changed_pick")?.passed ?? 0}/${m("memory_changed_pick")?.total ?? 0}`, guestChangedPick: `${m("guest_changed_pick")?.passed ?? 0}/${m("guest_changed_pick")?.total ?? 0}`, errors, forgetMsMedian: forgetTimes.sort((a, b) => a - b)[Math.floor(forgetTimes.length / 2)] ?? 0, forgetMsMax: Math.max(0, ...forgetTimes), durableBeforeRoomMsMedian: median(beforeRoom) ?? "n/a", durableAfterRoomMsMedian: median(afterRoom) ?? "n/a" },
     langsmith: { uploaded: upload, experiment: res.experimentName, url, dataset: upload ? name : undefined },
     sentence: upload ? sentence : `${sentence} (local run)`,
     aborted: errors > 0,
@@ -350,6 +355,7 @@ async function main() {
   console.log("\n" + sentence);
   if (isFind) console.log(JSON.stringify(perSet));
   console.log(list.map((x) => `${x.key}: ${x.passed}/${x.total}`).join("\n"));
+  if (!isFind) console.log(`forget ms median ${median(forgetTimes)} max ${Math.max(0, ...forgetTimes)}; durable job before the room changes: median ${median(beforeRoom)} ms; after (receipt only): median ${median(afterRoom)} ms`);
   console.log(upload ? `LangSmith experiment: ${url ?? res.experimentName}` : "Local run: set LANGSMITH_API_KEY to upload.");
   if (!isFind) await api("POST", "/api/reset");
   await closeAll();
