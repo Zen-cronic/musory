@@ -143,7 +143,7 @@ function showForgotten(r) {
   $("forgetting").classList.add("hidden");
   const el = $("receipt");
   const RING = `<svg class="mark ring wide draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M34 5 C 90 1, 160 1, 208 7 C 217 32, 217 78, 209 103 C 150 109, 70 109, 11 103 C 3 78, 3 32, 12 8 C 30 4, 52 3, 70 4"/></svg>`;
-  el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><a class="back" href="/about" id="receipt-back" aria-label="Back to Musory">&larr; Back</a><span class="wordmark">Musory</span></div>
+  el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><a class="back" href="/about" id="receipt-back" aria-label="Back to Musory">Back</a><span class="wordmark">Musory</span></div>
     <h1 class="display">You're forgotten</h1>
     <div class="figure marked" id="receipt-count" data-testid="receipt-count">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div>
     <p>records about you, deleted in one step</p>
@@ -240,7 +240,7 @@ $("bored").addEventListener("click", () => { $("more").open = false; });
   let x0 = null, dx = 0;
   // One gentle nudge on first load shows the card can be swiped
   if (!reduce) { card.classList.add("nudge"); card.addEventListener("animationend", () => card.classList.remove("nudge"), { once: true }); }
-  const stamps = (v) => { card.querySelector(".stamp-like").style.opacity = Math.max(0, Math.min(1, v / 90)); card.querySelector(".stamp-skip").style.opacity = Math.max(0, Math.min(1, -v / 90)); };
+  const stamps = (v) => { const L = card.querySelector(".edge-l"), Rr = card.querySelector(".edge-r"); const kl = Math.max(0, Math.min(1, -v / 90)), kr = Math.max(0, Math.min(1, v / 90)); L.style.transform = `scale(${1 + kl * .4})`; L.style.color = kl > .3 ? "#FFFFFF" : ""; Rr.style.transform = `scale(${1 + kr * .4})`; Rr.style.color = kr > .3 ? "var(--band)" : ""; card.querySelector(".stamp-like").style.opacity = Math.max(0, Math.min(1, v / 90)); card.querySelector(".stamp-skip").style.opacity = Math.max(0, Math.min(1, -v / 90)); };
   const reset = () => { card.classList.remove("dragging"); card.style.transform = ""; stamps(0); };
   card.addEventListener("pointerdown", (e) => { x0 = e.clientX; dx = 0; card.classList.add("dragging"); card.setPointerCapture(e.pointerId); });
   card.addEventListener("pointermove", (e) => { if (x0 === null) return; dx = e.clientX - x0; card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`; stamps(dx); });
