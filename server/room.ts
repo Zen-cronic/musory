@@ -437,8 +437,15 @@ export function scheduleRefresh(venueId: VenueId, delay?: number): Promise<void>
     s.timer = setTimeout(() => runRefresh(venueId), wait);
   });
 }
+// While forget me's transaction runs, rooms don't rewrite crowd memory or tastes, so the transaction
+// never hits write conflicts (and retries) with a busy room.
+let forgetting = 0;
 async function runRefresh(venueId: VenueId) {
   const s = refreshState[venueId];
+  if (forgetting > 0) {
+    s.timer = setTimeout(() => runRefresh(venueId), 150);
+    return;
+  }
   s.timer = undefined;
   s.running = true;
   const waiters = s.waiters.splice(0);
@@ -819,9 +826,13 @@ async function countFor(personId: string, session?: ClientSession) {
 export async function forget(personId: string) {
   forgetEpoch++;
   VENUE_IDS.forEach((v) => hold.add(v));
+  // Let any room refresh already writing finish first, then hold new ones until the delete commits.
+  forgetting++;
+  for (let i = 0; i < 40 && VENUE_IDS.some((v) => refreshState[v].running); i++) await new Promise((r) => setTimeout(r, 50));
   try {
     return await forgetInner(personId);
   } finally {
+    forgetting--;
     VENUE_IDS.forEach((v) => hold.delete(v));
   }
 }
