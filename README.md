@@ -126,6 +126,7 @@ Crowd memory holds no identities, so how does forget me find your share? Each cr
 | Voyage AI | `voyage-4` | Turns each track's written description, and a guest's own words, into vectors. Catalogue embeddings are cached in Atlas | `server/embed.ts`, `server/find.ts` |
 | Voyage AI | `rerank-3` (Voyage API) | Re-orders the top 5 catalogue matches for "What was that track?" (right track first in 18 of 20 test descriptions, 17 without it). Mixed catalogue and new-track results use vector scores | `server/find.ts` |
 | ElevenLabs | Music (`music_v2_5`) | Makes a new 15-second track from the room's shared taste when the crowd's taps move it, from genre, tempo and texture words only. The 19 catalogue clips were also made with ElevenLabs Music | `server/music.ts` |
+| ElevenLabs | Text to Speech (`eleven_v4`) and Voice Cloning | Narrates the 1-minute demo video in a clone of the builder's own voice. Not used inside the app. | demo video |
 | LangChain | LangSmith evaluations | Scripted scenarios run against the real server with plain-code checks: 9 of 9 uploaded scenarios passed (no trace of a forgotten guest in the checked collections, and each room chose without them). The run (9 completed of 14 planned) is kept in the team's LangSmith project, and the latest result shows on the app's proof page. | `scripts/eval.ts` |
 | LangChain | LangGraph with the MongoDB checkpointer | Forget is one transaction. Its follow-up verification runs as a LangGraph job checkpointed in Atlas and can resume after a restart once saved | `server/forget-graph.ts` |
 
