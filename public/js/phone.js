@@ -49,6 +49,7 @@ function render(m) {
   $("carry").textContent = m.taste ? `Your taste goes with you. It counts at ${m.venue ?? "a venue"} only while you're checked in.` : "Tap \"I like this\" to start your taste.";
   $("tonight-state").textContent = m.tonight ? `Tonight only at ${venueName(m.tonight.venueId)} until ${new Date(m.tonight.expiresAt).toLocaleTimeString()}. These taps never enter your long-term taste unless you keep one.` : "Your taps go into your long-term taste.";
   $("tonight").textContent = m.tonight ? "End tonight-only" : "Try something different tonight (here only)";
+  $("night").innerHTML = (m.night || []).map((p) => `<div data-track-id="${p.trackId}">${new Date(p.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ${p.title} <span class="mute">${p.genre}</span></div>`).join("") || "Nothing yet.";
   $("taps").innerHTML = (m.taps || []).slice(0, 12).map((t) => `
     <div class="tap" data-tap-id="${t.tapId}"><span>${t.signal > 0 ? "♥" : "✕"} ${t.title} <span class="mute">${t.genre} · ${venueName(t.venueId)}</span></span>
     <span class="mono mute">${t.status === "superseded" ? "superseded" : t.scope === "tonight" ? (t.promoted ? "kept" : `<button data-keep="${t.tapId}">Keep this one</button>`) : ""}</span></div>`).join("") || `<div class="mute">No taps yet.</div>`;

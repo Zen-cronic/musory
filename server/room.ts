@@ -971,7 +971,16 @@ export async function me(personId: string) {
     d.collection(PREFS).find({ personId }).sort({ at: -1 }).limit(5).toArray(),
   ]);
   const venueId = pres?.venueId as VenueId | undefined;
+  // Your night: what this room played since you checked in (from the room's play log, no listening).
+  const night = venueId
+    ? await d.collection(PLAYS).find({ venueId, startedAt: { $gte: pres!.since as Date } }).sort({ startedAt: -1 }).limit(12).toArray()
+    : [];
   return {
+    night: night.map((p) => {
+      const g = genClips.get(String(p.trackId));
+      const t = byId.get(String(p.trackId));
+      return { trackId: p.trackId, title: g?.title ?? t?.title ?? "Made for this room", genre: g?.genre ?? t?.genre ?? "", at: p.startedAt };
+    }),
     personId,
     label: guestLabel(personId),
     venueId: venueId ?? null,
