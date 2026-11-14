@@ -28,8 +28,11 @@
   .receipt h1 { font-size: 12vh; max-width: 16ch; }
   .receipt .figure { font-size: 30vh; justify-self: start; }
   .receipt p { font-weight: 800; font-size: 4.4vh; max-width: 30ch; line-height: 1.15; }
-  .sim { position: fixed; right: 2vh; bottom: 2vh; z-index: 20; }
-  .sim .btn { min-height: 36px; font-size: 14px; padding: 0 14px; background: var(--surface); color: var(--text); }
+  .sim { position: fixed; right: 3vh; top: 3vh; z-index: 20; display: flex; gap: 10px; align-items: center; }
+  .sim .btn.go { min-height: 64px; font-size: 22px; padding: 0 28px; }
+  .sim .reset { min-height: 30px; font-size: 12px; padding: 0 10px; opacity: .55; }
+  .sim .reset:hover, .sim .reset:focus-visible { opacity: 1; }
+  .right .top { padding-right: 330px; }
 </style>
 </head>
 <body>
@@ -46,7 +49,7 @@
   <div class="ticker" aria-hidden="true"><span id="ticker"></span></div>
 </main>
 <section class="flood receipt hidden" id="receipt" data-testid="stage-receipt"></section>
-<div class="sim controls"><button id="simulate" class="btn">Simulated guests</button></div>
+<div class="sim controls"><button id="reset" class="btn reset" title="Reset both rooms">Reset</button><button id="simulate" class="btn forget go">Simulated guests: 5 tap a new sound</button></div>
 <script type="module">
 import { api, events, $, genreName } from "/js/common.js";
 import { params, busy, settle, film } from "/js/look.js";
@@ -74,7 +77,12 @@ async function load() {
   next = s.next?.picked || null;
   showPlay(s.play);
 }
-$("simulate").onclick = () => api("/api/stage/simulate", { venueId: venue }).catch(() => {});
+$("simulate").onclick = async () => {
+  $("simulate").disabled = true;
+  try { await api("/api/stage/simulate", { venueId: venue }); } catch { /* the room shows what happened */ }
+  setTimeout(() => ($("simulate").disabled = false), 1500);
+};
+$("reset").onclick = () => { if (confirm("Reset both rooms? Every guest and tap is cleared.")) api("/api/reset", {}).catch(() => {}); };
 events({
   play: (e) => { if (e.venueId === venue) showPlay(e.play); },
   next: (e) => { if (e.venueId === venue) { next = e.decision?.picked || null; ticker(); settle(); } },
