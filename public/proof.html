@@ -21,7 +21,7 @@
   <div class="card"><button data-proof="tonight-leak">Save a tonight-only tap into long-term taste</button><div class="mute">Expected: 121 (unless the guest kept it)</div><div class="result" id="out-tonight-leak"></div></div>
   <div class="card"><button data-proof="double-tap">One guest likes the same play twice</button><div class="mute">Expected: E11000, "already counted"</div><div class="result" id="out-double-tap"></div></div>
 </div>
-<div class="row" style="margin-top:16px;display:flex;gap:12px"><button id="reset" style="width:auto">Reset the rooms</button><a href="/">Start here</a></div>
+<div class="row" style="margin-top:16px;display:flex;gap:12px"><button id="reset" style="width:auto">Reset the rooms</button><a href="/start">Start here</a></div>
 <script type="module">
 import { api, $, refusalTicket } from "/js/common.js";
 async function number() { const n = await api("/api/number"); $("number").textContent = n.sentence; }

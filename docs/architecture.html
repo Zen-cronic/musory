@@ -1,53 +1,39 @@
-<!doctype html><html data-look="evergreen"><head><meta charset="utf-8">
+<!doctype html>
+<html lang="en" data-look="evergreen">
+<head><meta charset="utf-8"><title>Musory architecture</title>
 <link rel="stylesheet" href="../public/css/musory.css">
 <style>
-:root{--ink:#001E2B;--slab:#112733;--line:#1C2D38;--paper:#FFFFFF;--mute:#B8C4C2;--band:#B1FF05}
-body{margin:0;width:1600px;height:1000px;background-color:#061621;background-attachment:scroll;background-image:radial-gradient(110% 85% at 92% -14%,rgba(0,104,74,.9) 0%,rgba(2,52,48,.5) 40%,rgba(6,22,33,0) 74%),radial-gradient(85% 75% at -8% 112%,rgba(0,104,74,.7) 0%,rgba(6,22,33,0) 64%),linear-gradient(180deg,#001E2B 0%,#061621 60%);color:var(--paper);font-family:Archivo,system-ui,sans-serif;overflow:hidden;position:relative}
-h1{font-size:50px;font-weight:900;font-stretch:75%;text-transform:uppercase;margin:36px 48px 6px;letter-spacing:-.01em}
-p.sub{font-size:22px;margin:0 48px 26px;color:var(--mute)}
-.row{display:grid;grid-template-columns:300px 44px 330px 44px 520px 44px 230px;margin:0 48px;align-items:start}
-.col h2{font-size:15px;text-transform:uppercase;letter-spacing:.1em;color:var(--mute);margin:0 0 10px;font-weight:800}
-.box{background:linear-gradient(165deg,#173543 0%,#112733 52%,#0D212B 100%);border:0;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:14px 16px;font-size:18px;line-height:1.3;margin-bottom:12px}
-.box b{display:block;font-size:21px;font-weight:800;margin-bottom:4px}
-.box small{display:block;font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--mute);margin-top:6px}
-.person{border-left:12px solid var(--band)}
-.paper{background:radial-gradient(130% 120% at 100% 0%,rgba(0,237,100,.3),rgba(0,237,100,0) 55%),linear-gradient(160deg,#034438 0%,#023430 60%);color:#fff}
-.paper small{color:#C0FAE6}
-.arrow{font-size:40px;font-weight:900;text-align:center;padding-top:120px;color:var(--band)}
-.logo{display:inline-flex;align-items:center;gap:8px;background:var(--paper);color:var(--ink);padding:4px 10px;font-weight:800;font-size:16px;margin-bottom:8px}
-.logo img{height:22px;width:22px}
-.code{font-family:"JetBrains Mono",monospace;color:#00ED64;font-weight:700}
-.foot{position:absolute;left:48px;bottom:30px;font-size:18px;color:var(--mute)}
-.foot b{color:var(--band)}
-</style></head><body>
-<h1>Musory: how the room remembers, and forgets</h1>
-<p class="sub">Guests tap. Atlas keeps each memory where it belongs. Vector Search picks the next track. Forget me reaches every venue in one transaction.</p>
-<div class="row">
- <div class="col"><h2>Guest's phone</h2>
-  <div class="box person"><b>Check in by QR code</b>Says yes or no: use my taste here; add my taps to this venue's crowd memory.<small>a person decides</small></div>
-  <div class="box"><b>Tap</b>I like this , Not for me , Bored of this , Tonight only<small>explicit taps only</small></div>
-  <div class="box person"><b>Forget me</b>Taste, taps, check-ins and their share of every crowd memory.<small>a person decides</small></div>
- </div>
- <div class="arrow">→</div>
- <div class="col"><h2>Server</h2>
-  <div class="box"><b>No model picks the track</b>Query vector = guests' taste 60% + venue crowd memory 25% + current track 15%.<small>newcomers and recent tappers count 3x</small></div>
-  <div class="box"><b>Logs every pick</b>next to the no-memory pick, and the "without you" pick forget me is checked against.</div>
-  <div class="box paper"><span class="logo" style="background:#111;color:#f4f1ea"><img src="logos/voyage.png">Voyage AI</span><b>voyage-4 embeddings</b>of each clip's description: genre, tempo, energy, sound.</div>
- </div>
- <div class="arrow">→</div>
- <div class="col"><h2>MongoDB Atlas (system of record)</h2>
-  <span class="logo"><img src="logos/mongodb.svg">MongoDB Atlas</span>
-  <div class="box"><b>Vector Search picks the next track</b>$vectorSearch, exact, energy and BPM pre-filters.</div>
-  <div class="box"><b>Taps, taste, crowd memory, decisions</b>One reaction per track <span class="code">E11000</span>. Crowd memory: 3+ people, no ids <span class="code">121</span>. Tonight taps stay out of long-term taste <span class="code">121</span>.</div>
-  <div class="box"><b>One login and View per venue</b>Pulse Club can't read Copper Bar's crowd memory <span class="code">13</span>.</div>
-  <div class="box person"><b>Forget me: one transaction + $graphLookup</b>From the guest's taps to every venue's crowd memory and decisions. Records N → 0.</div>
- </div>
- <div class="arrow">→</div>
- <div class="col"><h2>Room screens</h2>
-  <div class="box"><b>Change streams</b>drive the room: a new play or pick moves the screen and the music.</div>
-  <div class="box"><b>Copper Bar , Pulse Club</b>Now playing, next, the no-memory pick, crowd memory read with the venue's own login.</div>
-  <div class="box paper"><span class="logo" style="background:#111;color:#f4f1ea"><img src="logos/elevenlabs.svg" style="filter:invert(1)">ElevenLabs</span><b>Music</b>19 instrumental clips generated from descriptor-only prompts.</div>
- </div>
+body { width: 1600px; height: 1000px; overflow: hidden; background-attachment: scroll; }
+.wrap { padding: 56px 72px; display: grid; gap: 44px; }
+.head { display: flex; align-items: center; gap: 22px; }
+.head h1 { font-size: 56px; }
+.sysmap { gap: 56px 64px; }
+.sysmap .bx { min-height: 150px; padding: 22px; }
+.sysmap .bx .lg { height: 34px; } .sysmap .bx .lg img { height: 26px; }
+.sysmap .bx .lg .chipname { font-size: 30px; }
+.sysmap .bx b { font-size: 21px; }
+.sysmap .row1 + .row1::before { left: -60px; width: 54px; }
+.sysmap .down::after { bottom: -53px; height: 50px; }
+.steps-list { grid-template-columns: repeat(5, 1fr); gap: 20px; }
+.steps-list li { grid-template-columns: 1fr; font-size: 18px; }
+</style></head>
+<body><div class="wrap"><header class="head"><span class="wordmark lg">Musory</span><h1 class="display">How it works</h1></header>
+<div class="sysmap" aria-label="How Musory is built">
+  <div class="bx row1" id="n-tap"><span class="num">1</span><span class="lg"><span class="chipname">Phone</span></span><b>Check in, like, forget me</b></div>
+  <div class="bx row1 down" id="n-server"><span class="lg"><span class="chipname">Server</span></span><b>Blends the crowd's taste</b></div>
+  <div class="bx row1" id="n-room"><span class="lg"><span class="chipname">Room screen</span></span><b>Plays the next track</b></div>
+  <div class="bx row1" id="n-play"><span class="num">4</span><span class="lg"><span class="logo-chip"><img src="../public/img/elevenlabs.svg" alt="ElevenLabs" style="height:12px"></span></span><b>Music makes new tracks</b></div>
+  <div class="bx" id="n-embed"><span class="num">3</span><span class="lg"><span class="logo-chip"><img src="../public/img/voyage.svg" alt="Voyage AI"></span></span><b>Tracks and tastes as vectors</b></div>
+  <div class="bx atlas" id="n-change"><span class="num">2</span><span class="lg"><span class="logo-chip"><img src="../public/img/mongodb.svg" alt="MongoDB Atlas"></span></span><b>Every memory and its rules. Vector Search picks the next track.</b></div>
+  <div class="bx" id="n-lang"><span class="num">5</span><span class="lg"><span class="chipname">LangGraph</span></span><b>With LangSmith, checks forget me</b></div>
 </div>
-<div class="foot">Lime edge = <b>a person decides</b>. Codes are the database's own refusals: 13 not allowed to read, 121 breaks a rule, E11000 already counted.</div>
-</body></html>
+<ol class="steps-list">
+  <li><span class="n">1</span>A guest checks in on their phone and taps I like this.</li>
+  <li><span class="n">2</span>Atlas saves it under the venue's rules and tells the room at once.</li>
+  <li><span class="n">3</span>Voyage AI vectors and Atlas Vector Search pick the next track for the people here.</li>
+  <li><span class="n">4</span>When the crowd moves, ElevenLabs Music makes a new track for the room.</li>
+  <li><span class="n">5</span>Forget me deletes it all in one transaction. LangGraph checks it, LangSmith tests it.</li>
+</ol>
+
+
+</div></body></html>

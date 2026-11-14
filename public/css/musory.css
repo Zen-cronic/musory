@@ -181,3 +181,19 @@ body.legacy { padding: 24px; max-width: 1100px; margin: 0 auto; }
 .legacy button.primary { background: var(--band-bg, var(--band)); color: var(--on-band); border-color: transparent; }
 .legacy ol li { margin: 8px 0; }
 .legacy .result { margin-top: 10px; }
+
+/* System diagram: seven boxes, a logo and a few words each, numbered by the story */
+.sysmap { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto auto; gap: 34px 46px; position: relative; }
+.sysmap .bx { position: relative; background: var(--surface-bg, var(--surface)); color: var(--text); clip-path: var(--chamfer, none); padding: 16px 16px 14px; display: grid; gap: 6px; align-content: start; min-height: 108px; transition: box-shadow var(--t-base) var(--ease); }
+.sysmap .bx.atlas { grid-column: span 2; background: radial-gradient(130% 120% at 100% 0%, rgba(0,237,100,.24), rgba(0,237,100,0) 55%), linear-gradient(160deg, #034438 0%, #023430 60%); }
+.sysmap .bx .lg { height: 26px; display: flex; align-items: center; }
+.sysmap .bx .lg img { height: 20px; display: block; }
+.sysmap .bx .lg .chipname { font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: 22px; line-height: 1; }
+.sysmap .bx b { font-size: 16px; font-weight: 700; color: var(--muted); line-height: 1.25; }
+.sysmap .bx .num { position: absolute; top: 10px; right: 12px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--band-bg, var(--band)); color: var(--on-band); font: 800 14px var(--f-mono); }
+.sysmap .bx.lit { box-shadow: inset 0 0 0 3px var(--band); }
+.sysmap .row1 + .row1::before { content: ""; position: absolute; left: -40px; top: 50%; width: 34px; height: 3px; background: var(--band); }
+.sysmap .down::after { content: ""; position: absolute; left: 50%; bottom: -31px; width: 3px; height: 28px; background: var(--band); }
+.steps-list { list-style: none; display: grid; gap: 12px; counter-reset: s; }
+.steps-list li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; font-size: 17px; font-weight: 600; line-height: 1.3; }
+.steps-list li span.n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--band-bg, var(--band)); color: var(--on-band); font: 800 15px var(--f-mono); }

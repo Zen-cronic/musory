@@ -92,7 +92,7 @@ const wrap =
 
 // Pages
 const page = (file: string) => (_req: express.Request, res: express.Response) => res.sendFile(path.join(root, "public", file));
-app.get("/", page("start.html"));
+app.get("/", page("landing.html")); // the product page; /start is the room launcher
 app.get("/start", page("start.html"));
 app.get("/room/:venue", page("room.html"));
 app.get("/join/:venue", page("phone.html"));

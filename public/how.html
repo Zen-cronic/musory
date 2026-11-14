@@ -7,6 +7,10 @@
 <link rel="stylesheet" href="/css/musory.css">
 <style>
   body { min-height: 100vh; }
+  .overview { display: grid; gap: 22px; }
+  .overview .steps-list { grid-template-columns: repeat(5, 1fr); }
+  .overview .steps-list li { grid-template-columns: 1fr; font-size: 15px; }
+  .lanes { margin-top: 18px; }
   .how { display: grid; grid-template-rows: auto auto 1fr; min-height: 100vh; padding: 18px 22px; gap: 14px; }
   .head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .head h1 { font-size: calc(40px * var(--dscale)); }
@@ -57,15 +61,26 @@
   <header class="head">
     <a class="wordmark" href="/">Musory</a>
     <h1 class="display">How it works, live</h1>
-    <p>Each box lights up when the real operation&nbsp;runs.</p>
+    <p>Each box lights up when it&nbsp;works.</p>
   </header>
 
-  <section class="flow" aria-label="From a tap to the next track">
-    <div class="surface node" id="n-tap"><span class="when">Just now</span><span class="logo">Guest's phone</span><b>Taps "I like this"</b></div>
-    <div class="surface node" id="n-change"><span class="when">Just now</span><span class="logo"><span class="logo-chip"><img src="/img/mongodb.svg" alt="MongoDB Atlas"></span></span><b>Saves it and tells the room</b></div>
-    <div class="surface node" id="n-embed"><span class="when">Just now</span><span class="logo"><span class="logo-chip"><img src="/img/voyage.svg" alt="Voyage AI"></span></span><b>Tracks and tastes as vectors</b></div>
-    <div class="surface node" id="n-search"><span class="when">Just now</span><span class="logo"><span class="logo-chip"><img src="/img/mongodb.svg" alt="MongoDB Atlas"></span></span><b>Vector search picks the next track</b></div>
-    <div class="surface node" id="n-play"><span class="when">Just now</span><span class="logo"><span class="logo-chip"><img src="/img/elevenlabs.svg" alt="ElevenLabs" style="height:11px"></span></span><b>Plays a clip made by ElevenLabs Music</b></div>
+  <section class="overview">
+<div class="sysmap" aria-label="How Musory is built">
+  <div class="bx row1" id="n-tap"><span class="num">1</span><span class="lg"><span class="chipname">Phone</span></span><b>Check in, like, forget me</b></div>
+  <div class="bx row1 down" id="n-server"><span class="lg"><span class="chipname">Server</span></span><b>Blends the crowd's taste</b></div>
+  <div class="bx row1" id="n-room"><span class="lg"><span class="chipname">Room screen</span></span><b>Plays the next track</b></div>
+  <div class="bx row1" id="n-play"><span class="num">4</span><span class="lg"><span class="logo-chip"><img src="/img/elevenlabs.svg" alt="ElevenLabs" style="height:12px"></span></span><b>Music makes new tracks</b></div>
+  <div class="bx" id="n-embed"><span class="num">3</span><span class="lg"><span class="logo-chip"><img src="/img/voyage.svg" alt="Voyage AI"></span></span><b>Tracks and tastes as vectors</b></div>
+  <div class="bx atlas" id="n-change"><span class="num">2</span><span class="lg"><span class="logo-chip"><img src="/img/mongodb.svg" alt="MongoDB Atlas"></span></span><b>Every memory and its rules. Vector Search picks the next track.</b></div>
+  <div class="bx" id="n-lang"><span class="num">5</span><span class="lg"><span class="chipname">LangGraph</span></span><b>With LangSmith, checks forget me</b></div>
+</div>
+<ol class="steps-list">
+  <li><span class="n">1</span>A guest checks in on their phone and taps I like this.</li>
+  <li><span class="n">2</span>Atlas saves it under the venue's rules and tells the room at once.</li>
+  <li><span class="n">3</span>Voyage AI vectors and Atlas Vector Search pick the next track for the people here.</li>
+  <li><span class="n">4</span>When the crowd moves, ElevenLabs Music makes a new track for the room.</li>
+  <li><span class="n">5</span>Forget me deletes it all in one transaction. LangGraph checks it, LangSmith tests it.</li>
+</ol>
   </section>
 
   <section class="lanes">
@@ -117,9 +132,9 @@ import { params, settle } from "/js/look.js";
 const only = params.get("venue");
 const names = { copper: "Copper Bar", basement: "Pulse Club" };
 const mine = (e) => !only || !e.venueId || e.venueId === only;
-function light(id) { const n = $(id); n.classList.add("lit"); clearTimeout(n._t); n._t = setTimeout(() => n.classList.remove("lit"), 2600); }
+function light(id) { const n = $(id); if (!n) return; n.classList.add("lit"); clearTimeout(n._t); n._t = setTimeout(() => n.classList.remove("lit"), 2600); }
 function vectorSearch(e) {
-  light("n-embed"); light("n-search");
+  light("n-embed"); light("n-change"); light("n-server");
   const people = e.sharing || 0;
   $("vs-title").textContent = `Vector search: the next track for ${names[e.venueId] || "the room"}`;
   $("vs-plain").textContent = people ? `Searched with the blended taste of ${people} ${people === 1 ? "person" : "people"} here, at tonight's energy. Closer to 1 means a closer match.` : `No one here shares their taste yet, so it searched with the venue's crowd memory. Closer to 1 means a closer match.`;
@@ -165,7 +180,7 @@ function music(e, kind) {
   if (kind === "gen") { $("mu-prompt").textContent = `"${[...(d.genres || []).map(genreName), d.bpm && `${d.bpm} BPM`].filter(Boolean).join(", ")}"`; $("mu-plain").textContent = `No artist or song named. Ready in ${Math.round((e.ms || 0) / 100) / 10} seconds.`; }
   if (kind === "fallback") $("mu-plain").textContent = "It took too long, so the room played the closest track we have.";
 }
-function play(e) { if (!mine(e)) return; light("n-play"); if (!$("mu-plain").textContent || e.play?.composed) $("mu-plain").textContent = `Playing now in ${names[e.venueId]}: ${e.play.title}${e.play.composed ? ", made just now" : ""}.`; progress($("mu-progress"), e.play); }
+function play(e) { if (!mine(e)) return; light("n-room"); if (!$("mu-plain").textContent || e.play?.composed) $("mu-plain").textContent = `Playing now in ${names[e.venueId]}: ${e.play.title}${e.play.composed ? ", made just now" : ""}.`; progress($("mu-progress"), e.play); }
 const handlers = {
   vector_search: (e) => mine(e) && vectorSearch(e),
   change_event: (e) => mine(e) && change(e),
@@ -177,7 +192,7 @@ const handlers = {
   play,
 };
 for (const { type, data } of await api("/api/recent").catch(() => [])) { try { handlers[type]?.(data); } catch {} }
-document.querySelectorAll(".node.lit").forEach((n) => n.classList.remove("lit"));
+document.querySelectorAll(".lit").forEach((n) => n.classList.remove("lit"));
 const wrapped = Object.fromEntries(Object.entries(handlers).map(([k, f]) => [k, (e) => { f(e); settle(); }]));
 events({ ...wrapped, reset: () => location.reload() });
 settle();
