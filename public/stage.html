@@ -89,7 +89,7 @@ events({
   presence: (e) => { if (e.venueId === venue) { $("present").textContent = e.count; settle(); } },
   forgotten: (r) => {
     const el = $("receipt");
-    el.innerHTML = `<h1 class="display">${r.label} said forget me</h1><div class="figure marked" data-testid="receipt-count">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div><p>records about them, deleted in one step across both venues.</p>`;
+    el.innerHTML = `<h1 class="display">A guest said forget me</h1><div class="figure marked" data-testid="receipt-count">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div><p>records about them, deleted in one step across both venues.</p>`;
     el.classList.remove("hidden");
     busy(true);
     setTimeout(() => { busy(false); settle(); }, 800);

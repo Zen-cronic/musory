@@ -196,7 +196,7 @@ function sameQuery(before, after, who) {
   const el = $("same-count");
   el.innerHTML = `${before}<span class="count-arrow"></span>${after}${UNDER}`;
   el.classList.add("marked");
-  $("same-text").textContent = `Records left about ${who}`;
+  $("same-text").textContent = "Records left after the last forget me";
 }
 
 function showReceipt(r) {
@@ -209,7 +209,7 @@ function showReceipt(r) {
     return `<div class="line" data-venue="${v.venueId}"><b>${v.venue}</b>${crowd}${play}</div>`;
   }).join("");
   el.innerHTML = `<span class="kicker" style="color:inherit">Forget me</span>
-    <h2 class="display">${r.label} said forget me</h2>
+    <h2 class="display">A guest said forget me</h2>
     <div class="figure marked" id="receipt-count" data-testid="receipt-count" style="justify-self:start">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div>
     <p class="sub">records about them, deleted in one step</p>
     <div class="lines">${lines}</div>
