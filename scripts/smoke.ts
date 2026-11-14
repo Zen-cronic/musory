@@ -65,12 +65,12 @@ check("the taps change Copper Bar's pick vs the no-memory pick", moved, `playing
 const tap = (await api(`/api/me?personId=${guest}`)).taps?.[0];
 check("the tap is saved with track, venue and time", Boolean(tap?.trackId && tap?.venueId === "copper" && tap?.at));
 
-// 2. Taste carries to Basement Club at once.
+// 2. Taste carries to Pulse Club at once.
 const before = (await room("basement")).next;
 await api("/api/checkin", { personId: guest, venueId: "basement" });
 await sleep(2000); // the room re-picks right after the check-in
 r = await room("basement");
-check("taste applies at Basement Club immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
+check("taste applies at Pulse Club immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
 
 // "Tell the room what you want": a few words become one like on the closest track.
 if ((await api("/api/config")).vibe) {
@@ -99,7 +99,7 @@ await api("/api/tonight/end", { personId: guest });
 
 // 5. Venue isolation and venue memory rules.
 const cross = await api("/api/proof/cross-venue", {});
-check("Basement Club's login can't read Copper Bar's crowd memory (13)", cross.ok === false && cross.error?.code === 13);
+check("Pulse Club's login can't read Copper Bar's crowd memory (13)", cross.ok === false && cross.error?.code === 13);
 const own = await api("/api/proof/own-venue", {});
 check("Copper Bar's login reads its own crowd memory", own.ok === true);
 const raw = await api("/api/proof/venue-reads-taps", {});

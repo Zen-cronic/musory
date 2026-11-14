@@ -14,11 +14,11 @@ Your taps feed every room's crowd memory, which you never wrote. Forget me remov
 - **The room** (a laptop or screen at the venue) plays the next track picked from the people in the room, the venue's own crowd memory and the current track. It shows the pick next to the pick it would make with no memory at all.
 - **Your night** on the guest page lists what the room played while you were checked in, from the room's own play log: no microphone, no song recognition.
 - **Your taste is yours.** It goes with you to any venue you check into, so there's no cold start, and a venue uses it only while you're there.
-- **Each venue's crowd memory is private.** Copper Bar can't read Basement Club's, and neither can read your raw taps. Atlas refuses (error 13).
+- **Each venue's crowd memory is private.** Copper Bar can't read Pulse Club's, and neither can read your raw taps. Atlas refuses (error 13).
 - **Forget me** deletes your taste, your taps, your check-ins, and your share of every venue's crowd memory, in one transaction. The receipt shows the count going to 0, and both rooms re-pick and play the track they said they'd play without you.
 - **The room makes a new track when the crowd moves it.** When guests' taps change a room's leading sound, the room asks ElevenLabs Music for a new 15-second track at its current tempo (a composition plan that eases from the current sound into the new one) and crossfades into it over about 3 seconds, with filter sweeps. The screen says "Making a new track for the N people…", then "Made just now for this room". If the new track takes more than 10 seconds, the room plays the closest track from its catalogue and says so.
 
-Venues (Copper Bar, Basement Club), guests and track titles are fictional. The music is 19 instrumental clips we generated with ElevenLabs Music from descriptions of genre, tempo and sound only.
+Venues (Copper Bar, Pulse Club), guests and track titles are fictional. The music is 19 instrumental clips we generated with ElevenLabs Music from descriptions of genre, tempo and sound only.
 
 ## How the next track is picked
 
@@ -36,7 +36,7 @@ The search is exact (`$vectorSearch` with `exact: true`), pre-filtered on the ho
 
 | Question | Rule | Enforced by | Proof (live) |
 |---|---|---|---|
-| How do you keep one client's memory from leaking into another's? | Each venue reads its own crowd memory through its own database login and View. Venue logins can't read guests' taps or taste | Atlas database users with `read` on one View each | Basement Club's login reading Copper Bar's View: **13 Unauthorized**. A venue login reading `taps`: **13** |
+| How do you keep one client's memory from leaking into another's? | Each venue reads its own crowd memory through its own database login and View. Venue logins can't read guests' taps or taste | Atlas database users with `read` on one View each | Pulse Club's login reading Copper Bar's View: **13 Unauthorized**. A venue login reading `taps`: **13** |
 | How does the agent fix or drop a memory that is wrong or expired? | **Bored of this** marks your likes of the current sound `superseded` (kept, with who and when; Undo restores them). **Tonight only** keeps taps out of your long-term taste unless you tap "Keep this one". **Forget me** removes everything | A transaction for bored and undo; a `constraint`-level validator on taste; one transaction with `$graphLookup` for forget me | A tonight-only tap written into long-term taste: **121**. Forget me: **N → 0** |
 | How do you prove memory changed behavior? | Each pick is logged next to the no-memory pick. Before forget me, the guest's page shows what each room will play without them, from the same function forget me is checked against | Decisions in `derived`; the headline number | After forget me, each room's now-playing equals the promised "without you" track |
 
@@ -64,7 +64,7 @@ A guest can type a few words about something they heard ("dark rolling bassline,
 ## Checks that run on their own
 
 - **The follow-up to forget me.** Forget is one transaction. The follow-up checks run as a LangGraph job with a MongoDB checkpointer, so once started they finish even if the server restarts. A crash in the fraction of a second after the delete commits can skip the follow-up check, never the delete. Turn it on with `FORGET_GRAPH=1`.
-- **Evaluations (LangSmith).** `EVAL_ALLOW_RESET=1 pnpm eval` runs scripted scenarios through LangSmith `evaluate()` against the running server (it resets the demo data), with plain-code checks and no model grading; with `LANGSMITH_API_KEY` set the experiment is uploaded, without it the run stays local. It checks that forget me reaches 0 records; Basement Club is refused Copper Bar's crowd memory; a tonight-only tap never enters long-term taste; a guest who did not consent changes nothing; nothing about a forgotten guest is left in the job's checkpoints.
+- **Evaluations (LangSmith).** `EVAL_ALLOW_RESET=1 pnpm eval` runs scripted scenarios through LangSmith `evaluate()` against the running server (it resets the demo data), with plain-code checks and no model grading; with `LANGSMITH_API_KEY` set the experiment is uploaded, without it the run stays local. It checks that forget me reaches 0 records; Pulse Club is refused Copper Bar's crowd memory; a tonight-only tap never enters long-term taste; a guest who did not consent changes nothing; nothing about a forgotten guest is left in the job's checkpoints.
 
 ## How forget me reaches every copy
 

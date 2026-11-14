@@ -23,7 +23,7 @@ await phone.waitForTimeout(600);
 check("Forget me is visible after check-in", await phone.isVisible("#forget"));
 await phone.click("#switch-venue");
 await phone.waitForTimeout(1500);
-check("after switching, the page follows the guest to Basement Club", (await phone.textContent("#venue-name")) === "Basement Club");
+check("after switching, the page follows the guest to Pulse Club", (await phone.textContent("#venue-name")) === "Pulse Club");
 check("after switching, no check-in sheet", !(await phone.isVisible("#consent")));
 check("after switching, Forget me is still visible", await phone.isVisible("#forget"));
 await phone.screenshot({ path: `${OUT}/e2e-phone-basement.png`, fullPage: true });

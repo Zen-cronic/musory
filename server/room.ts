@@ -1256,7 +1256,7 @@ async function resetInner() {
 }
 
 // Demo seed: one guest, Jess, whose portable taste is techno-heavy from last weekend
-// at Basement Club. She is not checked in anywhere yet, so each scripted step lands the same way every run.
+// at Pulse Club. She is not checked in anywhere yet, so each scripted step lands the same way every run.
 export const DEMO_GUEST = { id: "g-jess", name: "Jess" };
 export function filmReset() {
   const run = resetChain.then(() => filmInner());

@@ -25,8 +25,8 @@ export const VENUES: Record<VenueId, { name: string; short: string; view: string
     note: "Saturdays build slowly: warm house until midnight, then afro and disco. Peak around 1am.",
   },
   basement: {
-    name: "Basement Club",
-    short: "Basement",
+    name: "Pulse Club",
+    short: "Pulse",
     view: "v_basement",
     login: "basement",
     note: "Low ceiling, big system. Techno and trance after 11pm; the floor empties below 125 BPM.",
