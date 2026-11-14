@@ -12,6 +12,7 @@ Your taps feed every room's crowd memory, which you never wrote. Forget me remov
 
 - **A guest** scans the venue's QR code, checks in, and says yes or no to two things: "use my taste here while I'm checked in" and "add my taps to this venue's crowd memory". Then they tap **I like this**, **Not for me** or **Bored of this** on whatever is playing. No mic, no listening, no guessing at mood: only explicit taps.
 - **The room** (a laptop or screen at the venue) plays the next track picked from the people in the room, the venue's own crowd memory and the current track. It shows the pick next to the pick it would make with no memory at all.
+- **Your night** on the guest page lists what the room played while you were checked in, from the room's own play log: no microphone, no song recognition.
 - **Your taste is yours.** It goes with you to any venue you check into, so there's no cold start, and a venue uses it only while you're there.
 - **Each venue's crowd memory is private.** Copper Room can't read Basement 2's, and neither can read your raw taps. Atlas refuses (error 13).
 - **Forget me** deletes your taste, your taps, your check-ins, and your share of every venue's crowd memory, in one transaction. The receipt shows the count going to 0, and both rooms re-pick and play the track they said they'd play without you.
