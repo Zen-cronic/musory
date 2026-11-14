@@ -51,7 +51,7 @@ const guest = `smoke-${Date.now() % 1_000_000}`;
 
 // 1. Check in with consent, then taps change the pick against the no-memory pick.
 const c = await api("/api/checkin", { personId: guest, venueId: "copper", scopes: ["use_taste", "contribute_crowd"] });
-check("check in at Copper Room with consent", c.venueId === "copper" && c.consents?.[0]?.scopes?.length === 2);
+check("check in at Copper Bar with consent", c.venueId === "copper" && c.consents?.[0]?.scopes?.length === 2);
 await api("/api/tap", { personId: guest, signal: 1, trackId: "t17" });
 await api("/api/tap", { personId: guest, signal: 1, trackId: "t18" });
 const dup = await api("/api/tap", { personId: guest, signal: 1, trackId: "t17" });
@@ -61,16 +61,16 @@ let r = await room("copper");
 // Either the room already moved to the guest's sound (the play records what the no-memory pick was),
 // or the next pick differs from the no-memory pick.
 const moved = r.play?.memoryChangedPick === true || r.next?.memoryChangedPick === true;
-check("the taps change Copper Room's pick vs the no-memory pick", moved, `playing ${r.play?.title} (no memory: ${r.play?.baselinePick?.title ?? "-"}), next ${r.next?.picked?.title} (no memory: ${r.next?.baselinePick?.title})`);
+check("the taps change Copper Bar's pick vs the no-memory pick", moved, `playing ${r.play?.title} (no memory: ${r.play?.baselinePick?.title ?? "-"}), next ${r.next?.picked?.title} (no memory: ${r.next?.baselinePick?.title})`);
 const tap = (await api(`/api/me?personId=${guest}`)).taps?.[0];
 check("the tap is saved with track, venue and time", Boolean(tap?.trackId && tap?.venueId === "copper" && tap?.at));
 
-// 2. Taste carries to Basement 2 at once.
+// 2. Taste carries to Basement Club at once.
 const before = (await room("basement")).next;
 await api("/api/checkin", { personId: guest, venueId: "basement" });
 await sleep(2000); // the room re-picks right after the check-in
 r = await room("basement");
-check("taste applies at Basement 2 immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
+check("taste applies at Basement Club immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
 
 // "Tell the room what you want": a few words become one like on the closest track.
 if ((await api("/api/config")).vibe) {
@@ -99,9 +99,9 @@ await api("/api/tonight/end", { personId: guest });
 
 // 5. Venue isolation and venue memory rules.
 const cross = await api("/api/proof/cross-venue", {});
-check("Basement 2's login can't read Copper Room's crowd memory (13)", cross.ok === false && cross.error?.code === 13);
+check("Basement Club's login can't read Copper Bar's crowd memory (13)", cross.ok === false && cross.error?.code === 13);
 const own = await api("/api/proof/own-venue", {});
-check("Copper Room's login reads its own crowd memory", own.ok === true);
+check("Copper Bar's login reads its own crowd memory", own.ok === true);
 const raw = await api("/api/proof/venue-reads-taps", {});
 check("a venue login can't read guests' raw taps (13)", raw.ok === false && raw.error?.code === 13);
 const under3 = await api("/api/proof/crowd-under-3", {});

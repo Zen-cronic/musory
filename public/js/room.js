@@ -156,7 +156,7 @@ function showMemory(m) {
 }
 
 // Live from the database: each change in plain words, newest first, at most four.
-const VENUE_SHORT = { copper: "Copper Room", basement: "Basement 2" };
+const VENUE_SHORT = { copper: "Copper Bar", basement: "Basement Club" };
 function changeWords(e) {
   const k = `${e.coll}:${e.op}:${e.kind ?? ""}`;
   if (e.coll === "taps" && e.op === "insert") return e.signal < 0 ? "Skip saved" : "Like saved, room updated";

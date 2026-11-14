@@ -18,14 +18,14 @@ export type VenueId = "copper" | "basement";
 export const VENUE_IDS: VenueId[] = ["copper", "basement"];
 export const VENUES: Record<VenueId, { name: string; short: string; view: string; login: "copper" | "basement"; note: string }> = {
   copper: {
-    name: "Copper Room",
+    name: "Copper Bar",
     short: "Copper",
     view: "v_copper",
     login: "copper",
     note: "Saturdays build slowly: warm house until midnight, then afro and disco. Peak around 1am.",
   },
   basement: {
-    name: "Basement 2",
+    name: "Basement Club",
     short: "Basement",
     view: "v_basement",
     login: "basement",

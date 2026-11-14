@@ -1,4 +1,4 @@
-// Times one forget me: from the request to Copper Room's now-playing changing (over SSE), and to the receipt.
+// Times one forget me: from the request to Copper Bar's now-playing changing (over SSE), and to the receipt.
 export {};
 const BASE = process.env.BASE || "http://localhost:4377";
 const post = (p: string, b: unknown) => fetch(BASE + p, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.json());

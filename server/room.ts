@@ -1256,7 +1256,7 @@ async function resetInner() {
 }
 
 // Demo seed: one guest, Jess, whose portable taste is techno-heavy from last weekend
-// at Basement 2. She is not checked in anywhere yet, so each scripted step lands the same way every run.
+// at Basement Club. She is not checked in anywhere yet, so each scripted step lands the same way every run.
 export const DEMO_GUEST = { id: "g-jess", name: "Jess" };
 export function filmReset() {
   const run = resetChain.then(() => filmInner());
@@ -1281,7 +1281,7 @@ async function filmInner() {
     }),
   );
   await rebuildTaste(DEMO_GUEST.id);
-  // Four more guests already in Copper Room, checked in with consent but no taps yet.
+  // Four more guests already in Copper Bar, checked in with consent but no taps yet.
   for (let i = 1; i <= 4; i++) await checkinQuiet(`sim-${i}`, "copper");
   await Promise.all(VENUE_IDS.map((v) => refreshNow(v)));
   return { ok: true, guest: DEMO_GUEST, phone: `/p/${DEMO_GUEST.id}?venue=copper`, consent: `/join?venue=copper&as=${DEMO_GUEST.id}` };
