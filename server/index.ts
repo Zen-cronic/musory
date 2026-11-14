@@ -13,6 +13,9 @@ import {
   emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset, guestTag, STAGE, simulateGuests,
 } from "./room.js";
 import { generateFromRoom, hasMusicKey, liveMusicOn, musicState } from "./music.js";
+import { forgetGraphOn, runForgetGraph, resumePending } from "./forget-graph.js";
+import { findOn, findTrack } from "./find.js";
+import { latestEvals } from "./evals.js";
 import { byId } from "./catalog.js";
 
 // "Start your taste": one short sample per sound, so a new guest can say what they like in one tap.
@@ -140,7 +143,12 @@ app.post("/api/bored/undo", wrap(async (req) => undoBored(personOf(req.body?.per
 app.post("/api/tonight/start", wrap(async (req) => startTonight(personOf(req.body?.personId))));
 app.post("/api/tonight/end", wrap(async (req) => endTonight(personOf(req.body?.personId))));
 app.post("/api/tonight/keep", wrap(async (req) => keepTonightTap(personOf(req.body?.personId), String(req.body?.tapId ?? ""))));
-app.post("/api/forget", wrap(async (req) => forget(personOf(req.body?.personId))));
+app.post("/api/forget", wrap(async (req) => (forgetGraphOn() ? runForgetGraph : forget)(personOf(req.body?.personId))));
+app.get("/api/find", wrap(async (req) => {
+  if (!findOn()) throw fail(404, "Track search is off.");
+  return findTrack(req.query.venue, req.query.q, req.query.mode);
+}));
+app.get("/api/evals/latest", wrap(async () => latestEvals()));
 
 // Room and demo controls
 app.post("/api/room/:venue/skip", wrap(async (req) => {
@@ -226,6 +234,7 @@ app.listen(port, host, async () => {
     console.log("change streams on");
     const d = await db();
     startPlayer();
+    if (forgetGraphOn()) void resumePending();
     if (!(await d.collection(PLAYS).countDocuments({}))) await resetAndSeed();
     console.log("rooms playing");
   } catch (e) {
