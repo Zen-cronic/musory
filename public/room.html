@@ -43,8 +43,8 @@
   .toast-feed { position: fixed; right: 22px; bottom: 22px; max-width: 300px; z-index: 22; pointer-events: none; }
   .toast-feed .feed { background: none; padding: 0; min-height: 0; }
   .toast-feed .feed .kicker { display: none; }
-  .toast-feed .ev { display: none; white-space: normal; font-size: 17px; padding: 10px 14px; box-shadow: 0 0 0 2px var(--db, var(--band)); }
-  .toast-feed .ev.show { display: flex; }
+  .toast-feed .ev { display: flex; opacity: 0; animation: none; transition: opacity .2s var(--ease); white-space: normal; font-size: 17px; padding: 10px 14px; box-shadow: inset 3px 0 0 var(--db, var(--band)); }
+  .toast-feed .ev.show { opacity: 1; }
   .join { padding: 14px; display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: center; }
   .join img { width: 132px; height: 132px; display: block; background: #fff; }
   .join p { font-weight: 800; font-size: 20px; line-height: 1.1; }
@@ -63,7 +63,6 @@
   .feed { display: flex; gap: 8px; overflow: hidden; align-items: center; padding: 8px 12px; min-height: 52px; }
   .feed .kicker { white-space: nowrap; margin-right: 6px; color: var(--on-bg-muted); }
   .ev { display: flex; align-items: center; gap: 8px; white-space: nowrap; background: var(--surface); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: var(--s-2); font-weight: 600; animation: ev-in var(--t-screen) var(--ease); }
-  .feed .kicker + .ev { box-shadow: inset 0 0 0 3px var(--band); }
   .ev img { height: 15px; display: block; }
   @keyframes ev-in { from { opacity: 0; transform: translateX(-10px); } }
   .same { padding: 8px 14px; display: flex; align-items: center; gap: 12px; }

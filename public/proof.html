@@ -12,7 +12,7 @@
 <h1 class="big" style="font-size:44px">What the database enforces</h1>
 <div class="card"><div class="label">The number (recomputed now)</div><div id="number" class="mono" style="font-size:18px">…</div><button id="number-refresh" style="width:auto">Recompute</button></div>
 <div class="grid" style="margin-top:16px">
-  <div class="card"><button data-proof="cross-venue">Basement Club's login reads Copper Bar's crowd memory</button><div class="mute">Expected: 13 Unauthorized</div><div class="result" id="out-cross-venue"></div></div>
+  <div class="card"><button data-proof="cross-venue">Pulse Club's login reads Copper Bar's crowd memory</button><div class="mute">Expected: 13 Unauthorized</div><div class="result" id="out-cross-venue"></div></div>
   <div class="card"><button data-proof="own-venue">Copper Bar's login reads its own crowd memory</button><div class="mute">Expected: allowed</div><div class="result" id="out-own-venue"></div></div>
   <div class="card"><button data-proof="venue-reads-taps">Copper Bar's login reads guests' raw taps</button><div class="mute">Expected: 13 Unauthorized</div><div class="result" id="out-venue-reads-taps"></div></div>
   <div class="card"><button data-proof="crowd-under-3">Save a crowd memory built from 2 people</button><div class="mute">Expected: 121 (needs 3+)</div><div class="result" id="out-crowd-under-3"></div></div>

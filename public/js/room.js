@@ -173,19 +173,37 @@ function changeWords(e) {
   if (e.coll === "plays") return null;
   return "Database change";
 }
+// One calm toast. Meaningful events (a like, a refusal, a new track, forget me) show at most every
+// 4.5 s. Background changes (crowd memory, check-ins, picks) show only after 10 s of quiet.
+// A repeat of the message on screen extends it with a count instead of re-rendering.
+const QUIET = /^(Crowd memory|A guest (checked in|left)|Consent|Next track picked|A guest's taste|Tonight only changed|Database change|Like marked old)/;
+const toast = { el: null, text: "", count: 0, shownAt: 0, hide: 0 };
 function feed(words) {
   if (!words) return;
   const el = $("feed");
-  const chip = document.createElement("span");
-  chip.className = "ev";
-  chip.innerHTML = `${LEAF}<span></span>`;
-  chip.lastChild.textContent = words;
-  el.querySelector(".kicker").after(chip);
-  while (el.querySelectorAll(".ev").length > 4) el.querySelector(".ev:last-of-type").remove();
-  // One chip at a time, shown briefly: the room stays calm between events.
-  el.querySelectorAll(".ev.show").forEach((x) => x.classList.remove("show"));
-  chip.classList.add("show");
-  setTimeout(() => chip.classList.remove("show"), 3200);
+  if (!toast.el) {
+    toast.el = document.createElement("span");
+    toast.el.className = "ev";
+    toast.el.innerHTML = `${LEAF}<span></span>`;
+    el.querySelector(".kicker").after(toast.el);
+  }
+  const now = Date.now();
+  const visible = toast.el.classList.contains("show");
+  const quiet = QUIET.test(words);
+  if (visible && words === toast.text) {
+    toast.count += 1;
+    toast.el.lastChild.textContent = `${words} (${toast.count})`;
+  } else {
+    if (quiet && now - toast.shownAt < 10000) return;
+    if (visible && now - toast.shownAt < 4500) return;
+    toast.text = words;
+    toast.count = 1;
+    toast.el.lastChild.textContent = words;
+    toast.shownAt = now;
+  }
+  toast.el.classList.add("show");
+  clearTimeout(toast.hide);
+  toast.hide = setTimeout(() => toast.el.classList.remove("show"), 3800);
 }
 const txnWords = (e) => {
   const c = e.counts || {};
@@ -329,7 +347,7 @@ events({
   change_event: (e) => { if (mine(e)) { feed(changeWords(e)); settle(); } },
   txn: (e) => { if (mine(e)) { feed(txnWords(e)); settle(); } },
   refusal: (e) => {
-    feed(`Refused, code ${e.code}`);
+    feed(e.code === 13 ? "Refused: a venue can't read another venue's memory" : e.code === 11000 ? "Refused: already counted" : "Refused: breaks a memory rule");
     if (mine(e)) { $("refusals").innerHTML = refusalTicket(e) + [...$("refusals").children].slice(0, 1).map((x) => x.outerHTML).join(""); }
     settle();
   },
