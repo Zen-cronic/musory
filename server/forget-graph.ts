@@ -37,8 +37,9 @@ const State = Annotation.Root({
   tapIds: Annotation<string[]>(),
   tasteId: Annotation<string>(),
   clipIds: Annotation<string[]>(),
+  tombHmac: Annotation<string>(), // the keyed hash the tombstone already carries, never the id itself
   before: Annotation<number>(),
-  erased: Annotation<{ ran: boolean; skipped?: string; receipt?: Record<string, any> } | null>(),
+  erased: Annotation<{ ran: boolean; skipped?: string; receipt?: Record<string, any>; forgetMs?: number } | null>(),
   verified: Annotation<{ ok: boolean; recordsLeft: number; derivedPointingAtTaps: number; clipsComposedFromYou: number; clipsLeft: number; tombstone: boolean; picksMatched: boolean | null } | null>(),
   steps: Annotation<string[]>({ reducer: (a, b) => a.concat(b), default: () => [] }),
 });
@@ -67,24 +68,22 @@ const killAt = (step: string) => {
 
 async function accept(s: S): Promise<Partial<S>> {
   const d = await db();
-  const [taps, before, taste] = await Promise.all([
+  const [taps, before, taste, [walk]] = await Promise.all([
     d.collection(TAPS).find({ personId: s.personId }, { projection: { _id: 1 } }).toArray(),
     recordsFor(s.personId),
     d.collection(DERIVED).findOne({ kind: "taste", ownerId: s.personId }, { projection: { _id: 1 } }),
+    // The clips composed from this guest, found the way forget finds them: walking derivedFrom from the taps.
+    d
+      .collection(TAPS)
+      .aggregate([
+        { $match: { personId: s.personId } },
+        { $group: { _id: null, ids: { $push: "$_id" } } },
+        { $graphLookup: { from: DERIVED, startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure" } },
+        { $project: { clips: { $filter: { input: "$closure", as: "n", cond: { $eq: ["$$n.kind", "clip"] } } } } },
+      ])
+      .toArray()
+      .catch(() => [] as { clips: { _id: ObjectId }[] }[]),
   ]);
-  // The clips composed from this guest, found the way forget finds them: walking derivedFrom from the taps.
-  const [walk] = taps.length
-    ? await d
-        .collection(TAPS)
-        .aggregate([
-          { $match: { personId: s.personId } },
-          { $group: { _id: null, ids: { $push: "$_id" } } },
-          { $graphLookup: { from: DERIVED, startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure" } },
-          { $project: { clips: { $filter: { input: "$closure", as: "n", cond: { $eq: ["$$n.kind", "clip"] } } } } },
-        ])
-        .toArray()
-        .catch(() => [] as { clips: { _id: ObjectId }[] }[])
-    : [];
   const clipIds = ((walk?.clips ?? []) as { _id: ObjectId }[]).map((c) => String(c._id));
   return { tapIds: taps.map((t) => String(t._id)), tasteId: taste ? String(taste._id) : "", clipIds, before, erased: null, verified: null, steps: ["accept"] };
 }
@@ -92,9 +91,10 @@ async function accept(s: S): Promise<Partial<S>> {
 async function erase(s: S): Promise<Partial<S>> {
   killAt("erase");
   if ((await recordsFor(s.personId)) > 0) {
+    const t0 = Date.now();
     const receipt = (await forget(s.personId)) as Record<string, any>;
     killAt("erase-committed"); // the delete is committed but this step's checkpoint is not
-    return { erased: { ran: true, receipt }, steps: ["erase"] };
+    return { erased: { ran: true, receipt, forgetMs: Date.now() - t0 }, steps: ["erase"] };
   }
   // Nothing left: either an earlier attempt committed the delete before a restart, or there was nothing.
   const d = await db();
@@ -121,9 +121,8 @@ async function verify(s: S): Promise<Partial<S>> {
   // The job's guarantee is the delete itself; the pick check stays forget's own receipt line.
   const ok = recordsLeft === 0 && derivedPointingAtTaps === 0 && clipsLeft === 0 && tombstone;
   const v = { ok, recordsLeft, derivedPointingAtTaps, clipsComposedFromYou: clips.length, clipsLeft, tombstone, picksMatched };
-  await d.collection(TOMBSTONES).updateOne({ hmac: hmac(s.personId) }, { $set: { durableCheck: { ...v, steps: [...s.steps, "verify"], at: new Date() } } });
   // The guest's id and tap ids leave the job's state before its last checkpoint is written.
-  return { verified: v, personId: "", tapIds: [], tasteId: "", clipIds: [], steps: ["verify"] };
+  return { verified: v, tombHmac: hmac(s.personId), personId: "", tapIds: [], tasteId: "", clipIds: [], steps: ["verify"] };
 }
 
 let saver: MongoDBSaver | null = null;
@@ -156,9 +155,16 @@ async function checkpointDocs(threadId: string) {
 }
 
 async function finish(threadId: string, final: S, resumed: boolean) {
-  const { saver } = await ready();
-  const written = await checkpointDocs(threadId);
-  await saver.deleteThread(threadId);
+  const d = await db();
+  // In parallel: the verification goes onto the tombstone, and the job's checkpoints are deleted
+  // (what MongoDBSaver.deleteThread does, with both deletes at once).
+  await Promise.all([
+    final.tombHmac && final.verified
+      ? d.collection(TOMBSTONES).updateOne({ hmac: final.tombHmac }, { $set: { durableCheck: { ...final.verified, steps: final.steps, resumed, at: new Date() } } })
+      : null,
+    d.collection(CHECKPOINTS).deleteMany({ thread_id: threadId }),
+    d.collection(CHECKPOINT_WRITES).deleteMany({ thread_id: threadId }),
+  ]);
   const left = await checkpointDocs(threadId);
   const receipt = final.erased?.receipt ?? { totalBefore: final.before ?? 0, totalAfter: 0, venues: [] };
   return {
@@ -173,7 +179,6 @@ async function finish(threadId: string, final: S, resumed: boolean) {
       derivedPointingAtYourTaps: final.verified?.derivedPointingAtTaps ?? null,
       clipsComposedFromYou: final.verified?.clipsComposedFromYou ?? null,
       clipsLeft: final.verified?.clipsLeft ?? null,
-      checkpointsWritten: written,
       checkpointsLeft: left,
     },
   };
@@ -193,7 +198,9 @@ export async function runForgetGraph(personId: string) {
     const t0 = Date.now();
     const final = (await graph.invoke({ personId, steps: [] } as never, cfg)) as S;
     const r = await finish(threadId, final, false);
-    (r.durable as Record<string, unknown>).ms = Date.now() - t0;
+    const ms = Date.now() - t0;
+    // What the durable job adds on top of the room's own forget (checkpoints, verify, cleanup).
+    Object.assign(r.durable as Record<string, unknown>, { ms, overheadMs: final.erased?.forgetMs != null ? ms - final.erased.forgetMs : null });
     return r;
   })();
   running.set(threadId, job);
