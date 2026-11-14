@@ -37,6 +37,6 @@ export function progress(el, play) {
   tick();
 }
 export function refusalTicket(r) {
-  const code = r.code === 11000 ? "E11000 DuplicateKey" : `${r.code} ${r.codeName || ""}`;
-  return `<div class="ticket" data-code="${r.code}"><div class="code">${code}</div><div>${r.reason || ""}</div><div class="mono" style="font-size:11px">${r.where || ""}</div></div>`;
+  const code = r.code === 11000 ? "E11000" : `${r.code}${r.codeName ? " " + r.codeName : ""}`;
+  return `<div class="ticket" data-code="${r.code}"><div><b>${r.reason || "The database refused this."}</b></div><div class="code">Database refused it: code ${code}</div><div class="mono" style="font-size:11px">${r.where || ""}</div></div>`;
 }

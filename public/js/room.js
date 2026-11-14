@@ -49,9 +49,11 @@ function showNext(d) {
   n.dataset.trackId = d.picked?.trackId || "";
   $("with-memory").textContent = d.picked ? `${d.picked.title} (${d.picked.genre})` : "…";
   $("without-memory").textContent = d.baselinePick ? `${d.baselinePick.title} (${d.baselinePick.genre})` : "…";
+  $("without-memory").dataset.trackId = d.baselinePick?.trackId || "";
+  $("with-memory").dataset.trackId = d.picked?.trackId || "";
   const p = d.parts || {};
   const bits = [];
-  if (p.taste) bits.push(`${d.sharingCount} guest${d.sharingCount === 1 ? "" : "s"}' taste ${Math.round(p.taste * 100)}%`);
+  if (p.taste) bits.push(`${d.sharingCount} ${d.sharingCount === 1 ? "guest's" : "guests'"} taste ${Math.round(p.taste * 100)}%`);
   if (p.crowd) bits.push(`crowd memory of ${d.crowdContributors} people ${Math.round(p.crowd * 100)}%`);
   bits.push(`current track ${Math.round((p.now || 0) * 100)}%`);
   $("next-why").textContent = `Atlas Vector Search query: ${bits.join(" + ")}.`;
@@ -82,10 +84,12 @@ function feed(line) {
 
 function showReceipt(r) {
   const el = $("receipt");
+  const rooms = (r.venues || []).filter((v) => v.contributionRemoved).length;
   el.innerHTML = `<div class="label">Forget me · ${r.label}</div>
+    <h2 class="big" style="font-size:40px">Removed ${r.label}'s share from ${rooms} room${rooms === 1 ? "" : "s"}' crowd memory.</h2>
     <div class="count" id="receipt-count">${r.totalBefore} → ${r.totalAfter}</div>
-    <div>records about this guest, in one transaction (${r.txnMs} ms)</div>
-    ${(r.venues || []).map((v) => `<div style="margin-top:8px"><b>${v.venue}</b>: crowd memory ${v.crowdContributorsBefore} → ${v.crowdContributorsAfter} people · next pick ${v.pickBefore?.title ?? "–"} → ${v.pickAfter?.title ?? "–"} ${v.matchesWithoutYou ? "(matches the pick without them)" : ""}</div>`).join("")}
+    <div>records about this guest, in one database transaction (${r.txnMs} ms)</div>
+    ${(r.venues || []).map((v) => `<div style="margin-top:8px" data-venue="${v.venueId}"><b>${v.venue}</b>: crowd memory ${v.crowdContributorsBefore} → ${v.crowdContributorsAfter} people${v.crowdMemoryKept ? "" : " (not enough people: removed)"} · now playing <b>${v.pickAfter?.title ?? "–"}</b>${v.matchesWithoutYou ? ", the pick it promised without them" : ""}</div>`).join("")}
     <button id="receipt-close" style="margin-top:16px">Close</button>`;
   el.classList.remove("hidden");
   $("receipt-close").onclick = () => el.classList.add("hidden");

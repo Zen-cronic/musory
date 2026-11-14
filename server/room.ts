@@ -14,9 +14,9 @@ import { emit } from "./events.js";
 const DAY = 86_400_000;
 const PLAY_MS = Number(process.env.PLAY_MS || 15_000); // each clip is 15 s
 const TONIGHT_MS = Number(process.env.TONIGHT_MS || 120_000); // demo clock for "tonight only"
-const RECENT_TAP_MS = 120_000; // guests who reacted in the last 2 minutes count 3x in the room blend
+const RECENT_TAP_MS = 120_000; // guests who just arrived or reacted in the last 2 minutes count 3x in the room blend
 const TONIGHT_WINDOW_MS = 6 * 3600_000; // taps from tonight count 2x in a venue's crowd memory
-export const W = { taste: 0.5, crowd: 0.3, now: 0.2 };
+export const W = { taste: 0.6, crowd: 0.25, now: 0.15 };
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -209,6 +209,7 @@ async function guestsIn(venueId: VenueId, excludePerson?: string): Promise<{ pre
     ? ((await d.collection(TAPS).find({ sessionId: { $in: sessionIds }, status: "current" }).toArray()) as unknown as Tap[])
     : [];
   const recentTappers = new Set(recent.map(String));
+  for (const p of pres) if (Date.now() - new Date(p.since as Date).getTime() < RECENT_TAP_MS) recentTappers.add(String(p.personId));
   const guests: Guest[] = [];
   for (const id of sharing) {
     const t = tastes.find((x) => x.ownerId === id);
@@ -263,7 +264,7 @@ async function roomQuery(venueId: VenueId, opts: { excludePerson?: string; crowd
       crowdId = doc._id as ObjectId;
     }
   }
-  // Guests in the room: each counts once; anyone who reacted in the last 2 minutes counts 3x.
+  // Guests in the room: each counts once; anyone who just arrived or reacted in the last 2 minutes counts 3x.
   let tasteVec: number[] | null = null;
   const tasteMix: Record<string, number> = {};
   if (guests.length) {
@@ -282,7 +283,7 @@ async function roomQuery(venueId: VenueId, opts: { excludePerson?: string; crowd
   let parts = { ...W };
   if (!tasteVec && !crowdVec) parts = { taste: 0, crowd: 0, now: 1 };
   else if (!tasteVec) parts = { taste: 0, crowd: 0.6, now: 0.4 };
-  else if (!crowdVec) parts = { taste: 0.7, crowd: 0, now: 0.3 };
+  else if (!crowdVec) parts = { taste: 0.75, crowd: 0, now: 0.25 };
   const acc = new Array(1024).fill(0);
   if (tasteVec) addInto(acc, tasteVec, parts.taste);
   if (crowdVec) addInto(acc, crowdVec, parts.crowd);
@@ -958,15 +959,15 @@ export async function proof(name: string, personId?: string) {
       });
     case "others-taps":
       return tryInsert("Taste built from someone else's taps", "A guest's taste can only be built from their own taps.", {
-        kind: "taste", ownerId: "g-kofi", sourceOwners: ["g-kofi", "g-ines"], derivedFrom: [tapId], evidence: [], at: new Date(),
+        kind: "taste", ownerId: "g-ben", sourceOwners: ["g-ben", "g-carla"], derivedFrom: [tapId], evidence: [], at: new Date(),
       });
     case "identity-in-venue":
       return tryInsert("A guest id inside venue memory", "Venue memory can't hold a guest's id.", {
-        kind: "decision", venueId: "copper", personId: personId ?? "g-kofi", at: new Date(),
+        kind: "decision", venueId: "copper", personId: personId ?? "g-ben", at: new Date(),
       });
     case "tonight-leak": {
       const t = await d.collection(TAPS).findOne({ scope: "tonight", promotedBy: { $exists: false }, ...(personId ? { personId } : {}) });
-      const owner = (t?.personId as string) ?? personId ?? "g-kofi";
+      const owner = (t?.personId as string) ?? personId ?? "g-ben";
       const taste = await d.collection(DERIVED).findOne({ kind: "taste", ownerId: owner });
       const base = taste ?? { kind: "taste", ownerId: owner, sourceOwners: [owner], derivedFrom: [tapId], evidence: [] };
       const doc = { ...base, evidence: [...((base.evidence as unknown[]) ?? []), { tapId: t?._id ?? tapId, scope: "tonight" }] };
@@ -1026,14 +1027,14 @@ export async function headline() {
 
 // Reset and seed: two venues, their regulars from last weekend, one guest in each room
 const REGULARS: { id: string; venue: VenueId; likes: string[]; skips?: string[]; present?: boolean }[] = [
-  { id: "g-kofi", venue: "copper", likes: ["t01", "t02", "t05", "t04"], present: true },
-  { id: "g-ines", venue: "copper", likes: ["t06", "t08", "t09"], skips: ["t11"] },
-  { id: "g-rhys", venue: "copper", likes: ["t03", "t10", "t09"] },
-  { id: "g-noor", venue: "copper", likes: ["t05", "t07", "t08"] },
-  { id: "g-tomasz", venue: "basement", likes: ["t11", "t13", "t14"], present: true },
-  { id: "g-adaeze", venue: "basement", likes: ["t15", "t16", "t12"] },
-  { id: "g-yusuf", venue: "basement", likes: ["t13", "t18", "t11"], skips: ["t20"] },
-  { id: "g-hana", venue: "basement", likes: ["t14", "t12", "t16"] },
+  { id: "g-ben", venue: "copper", likes: ["t01", "t02", "t05", "t04"] },
+  { id: "g-carla", venue: "copper", likes: ["t06", "t08", "t09"], skips: ["t11"] },
+  { id: "g-tess", venue: "copper", likes: ["t03", "t10", "t09"] },
+  { id: "g-joel", venue: "copper", likes: ["t05", "t07", "t08"] },
+  { id: "g-mark", venue: "basement", likes: ["t11", "t13", "t14"] },
+  { id: "g-julie", venue: "basement", likes: ["t15", "t16", "t12"] },
+  { id: "g-sam", venue: "basement", likes: ["t13", "t18", "t11"], skips: ["t20"] },
+  { id: "g-ray", venue: "basement", likes: ["t14", "t12", "t16"] },
 ];
 
 export async function resetAndSeed() {
@@ -1065,4 +1066,29 @@ export async function resetAndSeed() {
   emit("reset", {});
   for (const v of VENUE_IDS) await advance(v);
   return { ok: true };
+}
+
+// Demo seed: one guest, Jess, whose portable taste is techno-heavy from last weekend
+// at Basement 2. She is not checked in anywhere yet, so each scripted step lands the same way every run.
+export const FILM_GUEST = { id: "g-jess", name: "Jess" };
+export async function filmReset() {
+  await resetAndSeed();
+  const d = await db();
+  const at0 = Date.now() - 7 * DAY + 3600_000;
+  const consent = await d.collection(CONSENTS).insertOne({
+    personId: FILM_GUEST.id, venueId: "basement", scopes: ["use_taste", "contribute_crowd"], grantedAt: new Date(at0), expiresAt: new Date(Date.now() + 8 * 3600_000),
+  });
+  const likes = ["t11", "t13", "t14", "t12"];
+  await d.collection(TAPS).insertMany(
+    likes.map((trackId, i) => {
+      const at = new Date(at0 + i * 600_000);
+      return {
+        personId: FILM_GUEST.id, venueId: "basement", playId: `past-basement-${trackId}-jess-${i}`, trackId, genre: byId.get(trackId)!.genre, signal: 1,
+        at, expiresAt: new Date(at.getTime() + 180 * DAY), consentId: consent.insertedId, scope: "long", status: "current", contribute: true,
+      };
+    }),
+  );
+  await rebuildTaste(FILM_GUEST.id);
+  await Promise.all(VENUE_IDS.map((v) => refreshNow(v)));
+  return { ok: true, guest: FILM_GUEST, phone: `/p/${FILM_GUEST.id}?venue=copper`, consent: `/join?venue=copper&as=${FILM_GUEST.id}` };
 }

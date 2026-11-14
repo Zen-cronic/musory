@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import path from "node:path";
 import os from "node:os";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
 import { db, redactError, isVenue, VENUES, VENUE_IDS, TAPS, DERIVED, PRESENCE, CONSENTS, SESSIONS, PREFS, PLAYS, TOMBSTONES, type VenueId } from "./db.js";
@@ -9,7 +10,7 @@ import { subscribe, emit, recentEvents, clientCount } from "./events.js";
 import {
   HttpError, fail, loadTracks, startPlayer, resetAndSeed, roomState, me, personOf, checkin, checkout, tap, bored, undoBored,
   startTonight, endTonight, keepTonightTap, forget, proof, headline, nextHour, clockState, advance, playView, rooms, guestLabel,
-  emitPresence, scheduleRefresh, crossVenueRead, withoutYou,
+  emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset,
 } from "./room.js";
 import { generateFromRoom, hasMusicKey } from "./music.js";
 import { byId } from "./catalog.js";
@@ -65,6 +66,13 @@ app.get("/me", page("phone.html"));
 app.get("/join", page("phone.html"));
 app.get("/p/:guest", page("phone.html"));
 app.get("/proof", page("proof.html"));
+// Pages the visual layer adds (stage mode, how it works, look comparison): 404 until the file exists.
+for (const name of ["stage", "how", "compare"])
+  app.get(`/${name}`, (_req, res) => {
+    const file = path.join(root, "public", `${name}.html`);
+    if (existsSync(file)) res.sendFile(file);
+    else res.status(404).send("Not built yet");
+  });
 
 // Stream
 app.get("/events", (req, res) => subscribe(res));
@@ -84,7 +92,8 @@ app.get("/api/config", (req, res) =>
 app.get("/api/qr", async (req, res) => {
   try {
     const venue = venueOf(req.query.venue);
-    const url = `${baseUrl(req)}/join/${venue}`;
+    const style = typeof req.query.style === "string" && /^[a-z0-9-]{1,24}$/.test(req.query.style) ? req.query.style : "";
+    const url = `${baseUrl(req)}/join/${venue}${style ? `?style=${style}` : ""}`;
     const svg = await QRCode.toString(url, { type: "svg", margin: 1, color: { dark: "#111111", light: "#F4F1EA" } });
     res.type("image/svg+xml").send(svg);
   } catch (e) {
@@ -122,10 +131,11 @@ app.post("/api/room/:venue/read-other", wrap(async (req) => {
 app.post("/api/clock/next", wrap(async () => nextHour()));
 app.post("/api/proof/:name", wrap(async (req) => proof(String(req.params.name), req.body?.personId ? personOf(req.body.personId) : undefined)));
 app.post("/api/reset", wrap(async () => resetAndSeed()));
+app.post("/api/film/reset", wrap(async () => filmReset()));
 app.post("/api/volunteer", wrap(async (req) => {
   const v = venueOf(req.body?.venueId);
   const d = await db();
-  const guests = await d.collection(PRESENCE).find({ venueId: v, personId: { $not: /^g-(kofi|ines|rhys|noor|tomasz|adaeze|yusuf|hana)$/ } }).toArray();
+  const guests = await d.collection(PRESENCE).find({ venueId: v, personId: { $not: /^g-(ben|carla|tess|joel|mark|julie|sam|ray)$/ } }).toArray();
   if (!guests.length) throw fail(409, "No guests checked in yet.");
   const pick = guests[Math.floor(Math.random() * guests.length)];
   emit("volunteer", { venueId: v, personId: pick.personId, label: guestLabel(String(pick.personId)) });

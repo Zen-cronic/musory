@@ -46,12 +46,24 @@ function render(m) {
     <span class="mono mute">${t.status === "superseded" ? "superseded" : t.scope === "tonight" ? (t.promoted ? "kept" : `<button data-keep="${t.tapId}">Keep this one</button>`) : ""}</span></div>`).join("") || `<div class="mute">No taps yet.</div>`;
   document.querySelectorAll("[data-keep]").forEach((b) => (b.onclick = async () => { render(await api("/api/tonight/keep", { personId: pid, tapId: b.dataset.keep })); toast("Kept in your long-term taste."); }));
 }
+let wyTimer;
+function withoutYou() {
+  clearTimeout(wyTimer);
+  wyTimer = setTimeout(async () => {
+    if (!state?.venueId && !state?.taps?.length) { $("without-you").innerHTML = ""; return; }
+    const w = await api(`/api/without?personId=${pid}`).catch(() => null);
+    if (!w) return;
+    $("without-you").innerHTML = `<div class="label">If you leave every crowd's memory</div>` + w.venues.map((v) =>
+      `<div data-venue="${v.venueId}"><b>${v.venue}</b> plays next: <span class="mono" data-role="with-you" data-track-id="${v.withYou?.trackId ?? ""}">${v.withYou?.title ?? "–"}</span> with you, <span class="mono" data-role="without-you" data-track-id="${v.withoutYou?.trackId ?? ""}">${v.withoutYou?.title ?? "–"}</span> without you</div>`).join("");
+  }, 300);
+}
 function showPlay(p) {
   const t = $("now-title");
   t.textContent = p.title;
   t.dataset.trackId = p.trackId;
   $("now-meta").textContent = `${p.genre} · ${p.bpm} BPM`;
   progress($("now-progress"), p);
+  withoutYou();
 }
 const act = (fn) => async () => {
   try { await fn(); } catch (e) { toast(e.message); }
@@ -87,10 +99,13 @@ async function doForget() {
   $("volunteer").classList.add("hidden");
   $("consent").classList.add("hidden");
   const el = $("receipt");
-  el.innerHTML = `<div class="label">Forgotten</div><div class="count" id="receipt-count">${r.totalBefore} → ${r.totalAfter}</div>
-    <div>records about you, removed in one transaction.</div>
-    ${r.venues.map((v) => `<div style="margin-top:8px"><b>${v.venue}</b>: ${v.contributionRemoved ? "your share of its crowd memory removed" : "nothing of yours kept"}</div>`).join("")}
-    <div class="mute" style="margin-top:8px">Taste, taps, check-ins: all gone. The venues keep their own notes.</div>`;
+  const rooms = r.venues.filter((v) => v.contributionRemoved).length;
+  el.innerHTML = `<div class="label">Forgotten</div>
+    <h2 class="big" style="font-size:26px">Removed your share from ${rooms} room${rooms === 1 ? "" : "s"}' crowd memory.</h2>
+    <div class="count" id="receipt-count">${r.totalBefore} → ${r.totalAfter}</div>
+    <div>records about you, in one database transaction.</div>
+    ${r.venues.map((v) => `<div style="margin-top:8px" data-venue="${v.venueId}"><b>${v.venue}</b>: ${v.contributionRemoved ? `crowd memory ${v.crowdContributorsBefore} → ${v.crowdContributorsAfter} people${v.crowdMemoryKept ? "" : " (not enough people, so it was removed)"}` : "none of your taps were in its crowd memory"}. Now playing <b>${v.pickAfter?.title ?? "–"}</b>${v.matchesWithoutYou ? ", the track it said it would play without you" : ""}.</div>`).join("")}
+    <div class="mute" style="margin-top:8px">Your taste, taps and check-ins are gone. The venues keep their own staff notes.</div>`;
   el.classList.remove("hidden");
 }
 $("forget-yes").onclick = act(doForget);
