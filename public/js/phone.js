@@ -50,7 +50,8 @@ function render(m) {
   $("switch-venue").dataset.testid = `checkin-venue-${other}`;
   $("carry").textContent = m.taste ? `Your taste goes with you. It counts at ${m.venue ?? "a venue"} only while you're checked in.` : "Tap \"I like this\" to start your taste.";
   $("tonight-state").textContent = m.tonight ? `Tonight only is on at ${venueName(m.tonight.venueId)} until ${new Date(m.tonight.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Tonight's likes stay out of your long-term taste unless you keep one.` : "";
-  $("tonight").textContent = m.tonight ? "End tonight only" : "Tonight only";
+  $("tonight").textContent = m.tonight ? "Only count my likes tonight: on" : "Only count my likes tonight: off";
+  $("tonight").setAttribute("aria-pressed", m.tonight ? "true" : "false");
   $("night").innerHTML = (m.night || []).map((p) => `<div class="tap" data-track-id="${p.trackId}"><span><b>${p.title}</b><br><span class="meta">${genreName(p.genre)}</span></span><span class="state">${new Date(p.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>`).join("") || `<div class="note">Nothing yet.</div>`;
   $("taps").innerHTML = (m.taps || []).slice(0, 12).map((t) => `
     <div class="tap" data-tap-id="${t.tapId}"><span>${t.signal > 0 ? "Liked" : "Skipped"} <b>${t.title}</b><br><span class="meta">${genreName(t.genre)}, ${venueName(t.venueId)}</span></span>
@@ -87,15 +88,15 @@ $("checkin").onclick = act(async () => {
   wantVenue = state.venueId;
   toast(`Checked in at ${state.venue}.`);
 });
-$("like").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: 1 }); if (r.me) render(r.me); toast(r.message); });
-$("skip").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: -1 }); if (r.me) render(r.me); toast(r.message); });
+$("like").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: 1 }); if (r.me) render(r.me); snack(r.already ? "Already counted" : "Liked"); });
+$("skip").onclick = act(async () => { const r = await api("/api/tap", { personId: pid, signal: -1 }); if (r.me) render(r.me); snack(r.already ? "Already counted" : "Skipped"); });
 $("bored").onclick = act(async () => {
   const r = await api("/api/bored", { personId: pid });
   render(r.me);
-  if (r.superseded) { lastPref = r.prefId; $("undo").classList.remove("hidden"); toast(`${r.superseded} ${r.genre} likes set aside. Kept, marked superseded.`); }
+  if (r.superseded) { lastPref = r.prefId; snack(`Playing something different. ${r.superseded} old likes set aside.`, true); }
   else toast(`You have no ${r.genre} likes to set aside.`);
 });
-$("undo").onclick = act(async () => { const r = await api("/api/bored/undo", { personId: pid, prefId: lastPref }); render(r.me); $("undo").classList.add("hidden"); toast(`${r.restored} likes restored.`); });
+$("undo").onclick = act(async () => { const r = await api("/api/bored/undo", { personId: pid, prefId: lastPref }); render(r.me); $("undo").classList.add("hidden"); $("snackbar").classList.add("hidden"); toast(`${r.restored} likes restored.`); });
 $("tonight").onclick = act(async () => render(await api(state?.tonight ? "/api/tonight/end" : "/api/tonight/start", { personId: pid })));
 $("switch-venue").onclick = act(async () => {
   const other = state.venueId === "copper" ? "basement" : "copper";
@@ -113,23 +114,49 @@ $("switch-venue").onclick = act(async () => {
 $("checkout").onclick = act(async () => render(await api("/api/checkout", { personId: pid })));
 $("forget").onclick = () => $("forget-confirm").classList.remove("hidden");
 $("forget-no").onclick = () => $("forget-confirm").classList.add("hidden");
+// Forgetting: each line ticks when its real step finishes, then the receipt.
+let forgetPlayed = false, forgetting = false;
+const tick = (n, text) => { const li = $(`fg-${n}`); li.classList.remove("wait"); li.classList.add("done"); if (text) li.querySelector("span").textContent = text; settle(); };
 async function doForget() {
-  const r = await api("/api/forget", { personId: pid });
+  forgetting = true; forgetPlayed = false;
   $("main").classList.add("hidden");
   $("forget-section").classList.add("hidden");
   $("volunteer").classList.add("hidden");
   $("consent").classList.add("hidden");
+  ["fg-1", "fg-2", "fg-3", "fg-4"].forEach((id, k) => { const li = $(id); li.classList.remove("done"); li.classList.toggle("wait", k > 0); });
+  $("forgetting").classList.remove("hidden");
+  busy(true);
+  let r;
+  try { r = await api("/api/forget", { personId: pid }); }
+  catch (e) { $("forgetting").classList.add("hidden"); busy(false); forgetting = false; throw e; }
+  tick(1, "Your likes and taste deleted");
+  const names = (r.venues || []).map((v) => v.venue).join(" and ");
+  tick(2, `Done at ${names}: ${r.totalBefore} records deleted in one step`);
+  const clips = r.composedClipsRemoved ?? r.before?.composedClips ?? 0;
+  tick(3, clips ? `${clips} ${clips === 1 ? "track" : "tracks"} made from your taste deleted` : "No tracks made from your taste to delete");
+  if (forgetPlayed) tick(4);
+  else await new Promise((res) => { const done = () => { tick(4); res(); }; window.__forgetPlayed = done; setTimeout(() => { if (window.__forgetPlayed === done) { window.__forgetPlayed = null; $("fg-4").querySelector("span").textContent = "Each room will choose without you"; tick(4); res(); } }, 4000); });
+  forgetting = false;
+  showForgotten(r);
+}
+function showForgotten(r) {
+  $("forgetting").classList.add("hidden");
   const el = $("receipt");
   const RING = `<svg class="mark ring wide draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M34 5 C 90 1, 160 1, 208 7 C 217 32, 217 78, 209 103 C 150 109, 70 109, 11 103 C 3 78, 3 32, 12 8 C 30 4, 52 3, 70 4"/></svg>`;
-  el.innerHTML = `<span class="wordmark">Musory</span>
+  el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><a class="back" href="/about" id="receipt-back" aria-label="Back to Musory">&larr; Back</a><span class="wordmark">Musory</span></div>
     <h1 class="display">You're forgotten</h1>
     <div class="figure marked" id="receipt-count" data-testid="receipt-count">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div>
     <p>records about you, deleted in one step</p>
-    <div class="surface receipt-box">${r.venues.map((v) => `<div class="row" data-venue="${v.venueId}"><b>${v.venue}</b><span>${v.contributionRemoved ? (v.crowdMemoryKept === false ? "Your share of its crowd memory: removed. Too few people were left, so it was deleted." : "Your share of its crowd memory: removed.") : "None of your likes were in its crowd memory."}</span>${v.pickAfter ? `<span class="${v.matchesWithoutYou ? "ok" : ""}">Next: ${v.pickAfter.title}${v.matchesWithoutYou ? ", the track it would play without you." : "."}</span>` : ""}</div>`).join("")}</div>
-    <p style="font-size:14px;font-weight:600">Your taste, likes and check-ins are gone. Each venue keeps only its own notes.</p>`;
+    <div class="surface receipt-box">${r.venues.map((v) => `<div class="row" data-venue="${v.venueId}"><b>${v.venue}</b><span>${v.contributionRemoved ? "Your share of its crowd memory: removed." : "None of your likes were in its crowd memory."}</span>${v.pickAfter ? `<span class="ok">Now choosing without you: ${v.pickAfter.title}.</span>` : ""}</div>`).join("")}</div>
+    <div class="exits"><button class="btn primary" id="checkin-again" style="background:var(--on-band);color:var(--band);border-color:var(--on-band)">Check in again</button><p>You'll start fresh. Nothing from before comes back.</p><a class="btn" id="receipt-done" href="/about" style="border-color:var(--on-band);color:var(--on-band)">Done</a></div>`;
   el.classList.remove("hidden");
-  busy(true);
-  setTimeout(() => { busy(false); settle(); }, 800);
+  $("checkin-again").onclick = () => {
+    try { localStorage.removeItem("musory.personId"); } catch {}
+    const v = state?.venueId || wantVenue || "copper";
+    location.href = `/join/${v}`;
+  };
+  busy(false);
+  setTimeout(settle, 800);
 }
 // What was that track? Live pitch only (hidden when filming). Shows name, genre and time played.
 let findTimer;
@@ -151,7 +178,10 @@ $("forget-yes").onclick = act(doForget);
 $("forget-big").onclick = act(doForget);
 
 events({
-  play: (e) => { if (state && e.venueId === state.venueId) showPlay(e.play); },
+  play: (e) => {
+    if (forgetting && e.play?.reason === "forget") { forgetPlayed = true; if (window.__forgetPlayed) { const f = window.__forgetPlayed; window.__forgetPlayed = null; f(); } }
+    if (state && e.venueId === state.venueId) showPlay(e.play);
+  },
   volunteer: (e) => { if (e.tag === guestTag(pid)) { $("volunteer").classList.remove("hidden"); window.scrollTo(0, 0); } },
   reset: async () => render(await api(`/api/me?personId=${pid}`)),
 });
@@ -167,6 +197,7 @@ async function samples() {
 (async () => {
   cfg = await api("/api/config");
   // "Tell the room what you want": a few words become one like on the closest track (Voyage + Vector Search).
+  if (!(cfg.vibe && !film)) $("vibe").classList.add("hidden");
   if (cfg.vibe && !film) {
     $("vibe").classList.remove("hidden");
     $("vibe-form").addEventListener("submit", async (e) => {
@@ -188,4 +219,41 @@ async function samples() {
   }
   samples();
   render(await api(`/api/me?personId=${pid}`));
+})();
+
+// Snackbar: a short note after an action, with Undo only where the app can undo it.
+let snackTimer;
+function snack(text, undo = false) {
+  $("snack-text").textContent = text;
+  $("undo").classList.toggle("hidden", !undo);
+  $("snackbar").classList.remove("hidden");
+  clearTimeout(snackTimer);
+  snackTimer = setTimeout(() => $("snackbar").classList.add("hidden"), undo ? 5000 : 2200);
+}
+// The More sheet
+$("more-close").onclick = () => { $("more").open = false; };
+$("bored").addEventListener("click", () => { $("more").open = false; });
+// Swipe the now-playing card: right likes, left skips. The same handlers as the buttons.
+(() => {
+  const card = $("swipe-card");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let x0 = null, dx = 0;
+  const stamps = (v) => { card.querySelector(".stamp-like").style.opacity = Math.max(0, Math.min(1, v / 90)); card.querySelector(".stamp-skip").style.opacity = Math.max(0, Math.min(1, -v / 90)); };
+  const reset = () => { card.classList.remove("dragging"); card.style.transform = ""; stamps(0); };
+  card.addEventListener("pointerdown", (e) => { x0 = e.clientX; dx = 0; card.classList.add("dragging"); card.setPointerCapture(e.pointerId); });
+  card.addEventListener("pointermove", (e) => { if (x0 === null) return; dx = e.clientX - x0; card.style.transform = `translateX(${dx}px)`; stamps(dx); });
+  const end = () => {
+    if (x0 === null) return; x0 = null;
+    const go = dx > 90 ? "like" : dx < -90 ? "skip" : null;
+    card.classList.remove("dragging");
+    if (go && !reduce) { card.style.transform = `translateX(${go === "like" ? 120 : -120}%)`; setTimeout(reset, 220); } else reset();
+    if (go) $(go).click();
+  };
+  card.addEventListener("pointerup", end);
+  card.addEventListener("pointercancel", () => { x0 = null; reset(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest?.("input, textarea, select") || $("main").classList.contains("hidden")) return;
+    if (e.key === "ArrowRight") $("like").click();
+    if (e.key === "ArrowLeft") $("skip").click();
+  });
 })();
