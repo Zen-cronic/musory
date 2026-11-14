@@ -20,16 +20,24 @@ const trackLine = (t) => (t ? `${genreName(t.genre)}${t.bpm ? `, ${t.bpm} BPM` :
 // just now (low-pass sweep down on the outgoing track, high-pass sweep down on the incoming one).
 const SWEEP_MS = 3000;
 let ctx = null;
-const chains = players.map((el) => ({ el, filter: null, gain: null }));
+const chains = players.map((el) => ({ el, filter: null, gain: null, stopTimer: 0 }));
 function ensureGraph() {
   if (ctx) return;
   ctx = new (window.AudioContext || window.webkitAudioContext)();
+  // Headroom and a limiter: two tracks overlap during a crossfade, and the sum must never clip.
   const master = ctx.createGain();
-  master.connect(ctx.destination);
+  master.gain.value = 0.85;
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -3;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.003;
+  limiter.release.value = 0.1;
+  master.connect(limiter).connect(ctx.destination);
   if (film) {
     // For filming: the room's audio after the filters, as a MediaStream.
     const dest = ctx.createMediaStreamDestination();
-    master.connect(dest);
+    limiter.connect(dest);
     window.__roomStream = dest.stream;
   }
   for (const c of chains) {
@@ -42,40 +50,69 @@ function ensureGraph() {
     src.connect(c.filter).connect(c.gain).connect(master);
   }
 }
+// Fully open filter: what every track ends on once its crossfade is over.
+function openFilter(c, t) {
+  c.filter.frequency.cancelScheduledValues(t);
+  c.filter.type = "lowpass";
+  c.filter.frequency.setValueAtTime(22000, t);
+  c.filter.Q.setValueAtTime(0.7, t);
+}
+function silence(c) {
+  clearTimeout(c.stopTimer);
+  const t = ctx.currentTime;
+  c.gain.gain.cancelScheduledValues(t);
+  c.gain.gain.setValueAtTime(0, t);
+  c.el.pause();
+  openFilter(c, t);
+}
+let fadeEndsAt = 0;
+let fadeGen = 0;
 function crossfade(src, sweep = false) {
   if (!started || !soundOn || !src) return;
   ensureGraph();
   ctx.resume().catch(() => {});
   const from = chains[active];
   const to = chains[1 - active];
+  // A new change while the last crossfade is still running: the track that was fading out stops now,
+  // so never more than two tracks sound at once and nothing gets cut off later by an old timer.
+  clearTimeout(to.stopTimer);
+  if (performance.now() < fadeEndsAt) silence(to);
   const dur = (sweep ? SWEEP_MS : CROSSFADE_MS) / 1000;
   const t = ctx.currentTime;
+  const gen = ++fadeGen;
   to.el.src = src;
   to.el.currentTime = 0;
   to.el.play().catch(() => {});
+  // Equal-power curves: the overlap keeps a steady loudness instead of a bump or a dip.
+  const steps = 32;
+  const fadeIn = new Float32Array(steps);
+  const fadeOut = new Float32Array(steps);
+  const startOut = from.gain.gain.value;
+  for (let i = 0; i < steps; i++) {
+    const x = i / (steps - 1);
+    fadeIn[i] = Math.sin((x * Math.PI) / 2);
+    fadeOut[i] = startOut * Math.cos((x * Math.PI) / 2);
+  }
   to.gain.gain.cancelScheduledValues(t);
-  to.gain.gain.setValueAtTime(0, t);
-  to.gain.gain.linearRampToValueAtTime(1, t + dur);
+  to.gain.gain.setValueCurveAtTime(fadeIn, t, dur);
   from.gain.gain.cancelScheduledValues(t);
-  from.gain.gain.setValueAtTime(from.gain.gain.value, t);
-  from.gain.gain.linearRampToValueAtTime(0, t + dur);
-  for (const c of [from, to]) c.filter.frequency.cancelScheduledValues(t);
+  from.gain.gain.setValueCurveAtTime(fadeOut, t, dur);
+  openFilter(from, t);
+  openFilter(to, t);
   if (sweep) {
-    from.filter.type = "lowpass";
     from.filter.frequency.setValueAtTime(18000, t);
     from.filter.frequency.exponentialRampToValueAtTime(250, t + dur);
     to.filter.type = "highpass";
     to.filter.frequency.setValueAtTime(1500, t);
     to.filter.frequency.exponentialRampToValueAtTime(20, t + dur);
-  } else {
-    from.filter.type = "lowpass";
-    from.filter.frequency.setValueAtTime(22000, t);
-    to.filter.type = "lowpass";
-    to.filter.frequency.setValueAtTime(22000, t);
+    // When the sweep ends, the new track's filter is fully open again (no muffled or thin beats).
+    setTimeout(() => { if (gen === fadeGen) openFilter(to, ctx.currentTime); }, dur * 1000 + 20);
   }
-  const el = from.el;
-  setTimeout(() => el.pause(), dur * 1000 + 100);
+  fadeEndsAt = performance.now() + dur * 1000;
+  clearTimeout(from.stopTimer);
+  from.stopTimer = setTimeout(() => silence(from), dur * 1000 + 60);
   active = 1 - active;
+  claimSound();
 }
 
 // Now playing: the title fades out and in with the audio crossfade; the page is settled after both.
@@ -304,6 +341,19 @@ if (!film && !embed) {
   $("help-slot").replaceWith(helpPanel([["A", "About this room: crowd memory and controls"], ["N", "Play the next track now"], ["H", "Next hour"], ["M", "Sound on or off"], ["?", "Show or hide this panel"]]));
 }
 if (film || embed) $("start-overlay").classList.add("hidden");
+// Only one room screen in this browser plays sound at a time: the one that most recently started.
+const tabId = Math.random().toString(36).slice(2);
+const channel = "BroadcastChannel" in window ? new BroadcastChannel("musory-room-sound") : null;
+function claimSound() {
+  channel?.postMessage({ playing: tabId });
+}
+channel?.addEventListener("message", (e) => {
+  if (e.data?.playing && e.data.playing !== tabId && soundOn && ctx) {
+    soundOn = false;
+    chains.forEach((c) => c.gain && silence(c));
+    $("sound").textContent = "Sound: playing in another tab";
+  }
+});
 $("start-room").onclick = () => {
   started = true;
   ensureGraph();
@@ -313,7 +363,7 @@ $("start-room").onclick = () => {
 const toggleSound = () => {
   soundOn = !soundOn;
   $("sound").textContent = `Sound: ${soundOn ? "on" : "off"}`;
-  if (!soundOn) players.forEach((p) => p.pause());
+  if (!soundOn) chains.forEach((c) => (c.gain ? silence(c) : c.el.pause()));
   else if (current) crossfade(current.audio);
 };
 $("sound").onclick = toggleSound;
@@ -369,3 +419,7 @@ events({
 });
 load();
 void look;
+
+// Diagnostics: what each of the two players is doing right now (used by the audio check script).
+window.__roomAudio = () =>
+  chains.map((c) => ({ paused: c.el.paused, src: c.el.currentSrc.split("/").pop(), gain: c.gain ? +c.gain.gain.value.toFixed(3) : null, filter: c.filter ? `${c.filter.type} ${Math.round(c.filter.frequency.value)}` : null }));
