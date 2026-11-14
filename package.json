@@ -12,13 +12,21 @@
     "lan": "LAN=1 tsx server/index.ts",
     "smoke": "tsx scripts/smoke.ts",
     "typecheck": "tsc --noEmit",
-    "stop": "lsof -t -iTCP:${PORT:-4377} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+    "stop": "lsof -t -iTCP:${PORT:-4377} -sTCP:LISTEN | xargs kill 2>/dev/null || true",
+    "eval": "tsx scripts/eval.ts",
+    "setup:search": "tsx scripts/setup-search.ts",
+    "smoke:forget-graph": "tsx scripts/forget-graph-smoke.ts"
   },
   "dependencies": {
+    "@langchain/core": "1.4.1",
+    "@langchain/langgraph": "1.7.4",
+    "@langchain/langgraph-checkpoint-mongodb": "1.5.1",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
+    "langsmith": "0.12.0",
     "mongodb": "7.9.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
