@@ -259,3 +259,12 @@ $("bored").addEventListener("click", () => { $("more").open = false; });
     if (e.key === "ArrowLeft") $("skip").click();
   });
 })();
+
+// The vibe box placeholder alternates between two examples (fixed under reduced motion).
+(() => {
+  const q = $("vibe-q");
+  if (!q || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const tips = ["Tell the room: upbeat, with more bass", "Tell the room: like a track you love"];
+  let i = 0;
+  setInterval(() => { if (document.activeElement !== q && !q.value) { i = (i + 1) % tips.length; q.placeholder = tips[i]; } }, 3000);
+})();

@@ -24,6 +24,12 @@ Afterwards the checked collections hold 0 records with your guest id, and the ro
 
 Toronto nightlife is shrinking ([CBC](https://www.cbc.ca/radio/costofliving/canada-nightlife-decline-9.6993902)), so venues need guests to come back. This is a prototype with simulated venues. A venue pilot would test whether guests prefer its choices.
 
+## The three questions, answered
+
+- **How do you keep one venue's memory from leaking into another's?** Each venue has its own database login that can read only its own View. Pulse Club reading Copper Bar's crowd memory is refused by Atlas (error 13). Crowd memory needs 3 or more people and holds no guest ids.
+- **How do you fix or drop a memory that's wrong or expired?** Skip it, or "Play something different" to set old likes aside (with Undo). "Only count my likes tonight" expires with Atlas TTL, and tracks made for the room expire after closing. Forget me deletes your likes, taste and the tracks made from them in one transaction, and rebuilds crowd memory without you.
+- **How do you prove memory changed behaviour?** Every pick is saved next to the pick the same search makes with no memory, and the room shows both. No language model picks tracks. In our scripted test, memory changed the pick in 8 of 9 scenarios, and a guest who didn't consent changed nothing.
+
 ## Screens
 
 | | |
