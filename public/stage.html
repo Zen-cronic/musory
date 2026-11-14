@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/css/musory.css">
 <style>
   body { height: 100vh; overflow: hidden; }
-  .stage { height: 100vh; display: grid; grid-template-columns: 46vh 1fr; grid-template-rows: 1fr auto; gap: 3.4vh 4vh; padding: 5vh 5vh 0; }
+  .stage { height: 100vh; display: grid; grid-template-columns: 46vh 1fr; grid-template-rows: 1fr; gap: 3.4vh 4vh; padding: 5vh; }
   .qr { padding: 3vh; display: grid; gap: 2vh; align-content: start; }
   .qr img { width: 100%; aspect-ratio: 1; background: #fff; display: block; }
   .qr p { font-family: var(--f-display); font-weight: 900; font-stretch: var(--stretch); text-transform: var(--case); font-size: 5vh; line-height: .95; }
@@ -46,7 +46,7 @@
     <div class="count"><span class="figure n" id="present" data-testid="stage-count">0</span><span class="l">people shaping the music</span></div>
     <div class="slab now" data-testid="now-playing" id="now-playing" data-track-id=""><span class="kicker">Now playing</span><span class="display t" id="now-title"></span><span class="g" id="now-meta"></span></div>
   </section>
-  <div class="ticker" aria-hidden="true"><span id="ticker"></span></div>
+  <div id="ticker" hidden></div>
 </main>
 <section class="flood receipt hidden" id="receipt" data-testid="stage-receipt"></section>
 <div class="sim controls"><button id="reset" class="btn reset" title="Reset both rooms">Reset</button><button id="simulate" class="btn forget go">Simulated guests: 5 tap a new sound</button></div>

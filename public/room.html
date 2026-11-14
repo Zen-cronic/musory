@@ -7,14 +7,14 @@
 <link rel="stylesheet" href="/css/musory.css">
 <style>
   body { min-height: 100vh; }
-  .room { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; padding: 18px 22px 16px; gap: 14px; }
+  .room { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; padding: 18px 22px 16px; gap: 14px; }
   .head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .head .venue { font-size: calc(40px * var(--dscale)); }
   .head .right { margin-left: auto; display: flex; align-items: center; gap: 18px; }
   .here { display: flex; align-items: baseline; gap: 8px; }
   .here .n { font-size: 52px; }
   .here span:last-child { font-weight: 700; }
-  .main { display: grid; grid-template-columns: 1fr 340px; gap: 14px; min-height: 0; }
+  .main { display: grid; grid-template-columns: 1fr 300px; gap: 14px; min-height: 0; }
   .left { display: grid; grid-template-rows: 1fr auto; gap: 14px; min-height: 0; }
   .now { padding: 58px 26px 22px; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; position: relative; overflow: hidden; min-height: 300px; }
   .now .live { position: absolute; top: 22px; left: 26px; display: flex; align-items: center; gap: 10px; }
@@ -31,7 +31,20 @@
   .pick .t { font-size: calc(34px * var(--dscale)); }
   .pick .g { font-size: var(--s-2); font-weight: 600; }
   .why { grid-column: 1 / -1; font-size: 17px; font-weight: 600; border-top: 2px solid currentColor; padding-top: 10px; }
-  .side { display: grid; grid-template-rows: auto 1fr; gap: 14px; min-height: 0; }
+  .side { display: grid; align-content: start; gap: 14px; min-height: 0; }
+  .side .join { grid-template-columns: 1fr; text-align: left; padding: 18px; }
+  .side .join img { width: 100%; height: auto; aspect-ratio: 1; }
+  .side .join p { font-size: 24px; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); z-index: 25; overflow: auto; padding: 18px; display: grid; align-content: start; gap: 14px; background: var(--bg); background-image: var(--fields, none); box-shadow: -2px 0 0 var(--slab-line); }
+  .drawer[hidden] { display: none; }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; }
+  .drawer-head h2 { font-size: 30px; }
+  .drawer .same { border-radius: var(--radius); }
+  .toast-feed { position: fixed; right: 22px; bottom: 22px; max-width: 300px; z-index: 22; pointer-events: none; }
+  .toast-feed .feed { background: none; padding: 0; min-height: 0; }
+  .toast-feed .feed .kicker { display: none; }
+  .toast-feed .ev { display: none; white-space: normal; font-size: 17px; padding: 10px 14px; box-shadow: 0 0 0 2px var(--db, var(--band)); }
+  .toast-feed .ev.show { display: flex; }
   .join { padding: 14px; display: grid; grid-template-columns: 132px 1fr; gap: 14px; align-items: center; }
   .join img { width: 132px; height: 132px; display: block; background: #fff; }
   .join p { font-weight: 800; font-size: 20px; line-height: 1.1; }
@@ -57,6 +70,7 @@
   .same .figure { font-size: 40px; white-space: nowrap; }
   .same p { font-size: 13px; font-weight: 600; line-height: 1.2; }
   .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .head .controls.btn { display: inline-flex; }
   .controls .btn { min-height: 38px; font-size: 14px; padding: 0 14px; text-decoration: none; }
   .receipt { position: fixed; inset: 0; z-index: 30; display: grid; align-content: center; gap: 22px; padding: 6vh 7vw; }
   .receipt h2 { font-size: calc(72px * var(--dscale)); max-width: 24ch; }
@@ -93,6 +107,7 @@
     <h1 id="venue-name" class="display venue">…</h1>
     <div class="right">
       <div class="here"><span id="present" class="figure n" data-testid="present-count">0</span><span>checked in</span></div>
+      <button id="about-room" class="btn small controls" type="button" aria-controls="about-drawer">About this room</button>
       <span id="menu-slot"></span>
     </div>
   </header>
@@ -137,7 +152,14 @@
         <img id="qr" alt="QR code to check in at this venue">
         <p>Scan to check&nbsp;in.<small>Your taste counts here only while you stay, and only if you say yes.</small><span class="url" id="join-url"></span></p>
       </section>
-      <section class="surface mix">
+    </aside>
+  </div>
+
+</div>
+
+<aside id="about-drawer" class="drawer" hidden aria-label="About this room">
+  <div class="drawer-head"><h2 class="display">About this room</h2><button id="about-close" class="btn small" type="button">Close</button></div>
+  <section class="surface mix">
         <h2 class="display">What the room likes</h2>
         <div id="mix" class="bars" data-testid="crowd-mix"></div>
         <div class="memory" data-testid="venue-memory">
@@ -146,17 +168,11 @@
           <div id="refusals" class="refusals"></div>
           <span id="memory-login" hidden></span>
         </div>
-      </section>
-    </aside>
-  </div>
-
-  <footer class="foot">
-    <div class="rail feed" id="feed" data-testid="db-feed"><span class="kicker">Live from the database</span></div>
-    <div class="slab same" data-testid="same-query">
+  </section>
+  <div class="slab same" data-testid="same-query">
       <span class="figure" id="same-count">0</span>
       <p id="same-text">Records left after forget me</p>
     </div>
-  </footer>
   <div class="controls">
     <button id="skip" class="btn">Play next now</button>
     <button id="next-hour" class="btn">Next hour</button>
@@ -168,8 +184,8 @@
     <a class="btn" id="link-how" href="/how">How it works, live</a>
     <span id="help-slot"></span>
   </div>
-</div>
-
+</aside>
+<div class="toast-feed"><div class="rail feed" id="feed" data-testid="db-feed"><span class="kicker">Live from the database</span></div></div>
 <section id="receipt" class="flood receipt hidden" data-testid="room-receipt"></section>
 <div id="tonight" hidden></div>
 <audio id="audio-a" preload="auto"></audio><audio id="audio-b" preload="auto"></audio>

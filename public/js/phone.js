@@ -50,7 +50,7 @@ function render(m) {
   $("switch-venue").dataset.testid = `checkin-venue-${other}`;
   $("carry").textContent = m.taste ? `Your taste goes with you. It counts at ${m.venue ?? "a venue"} only while you're checked in.` : "Tap \"I like this\" to start your taste.";
   $("tonight-state").textContent = m.tonight ? `Tonight only is on at ${venueName(m.tonight.venueId)} until ${new Date(m.tonight.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Tonight's likes stay out of your long-term taste unless you keep one.` : "";
-  $("tonight").innerHTML = m.tonight ? `End tonight only<span class="sub">Back to your usual taste</span>` : `Tonight only<span class="sub">Try something new</span>`;
+  $("tonight").textContent = m.tonight ? "End tonight only" : "Tonight only";
   $("night").innerHTML = (m.night || []).map((p) => `<div class="tap" data-track-id="${p.trackId}"><span><b>${p.title}</b><br><span class="meta">${genreName(p.genre)}</span></span><span class="state">${new Date(p.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>`).join("") || `<div class="note">Nothing yet.</div>`;
   $("taps").innerHTML = (m.taps || []).slice(0, 12).map((t) => `
     <div class="tap" data-tap-id="${t.tapId}"><span>${t.signal > 0 ? "Liked" : "Skipped"} <b>${t.title}</b><br><span class="meta">${genreName(t.genre)}, ${venueName(t.venueId)}</span></span>

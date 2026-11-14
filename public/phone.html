@@ -27,6 +27,14 @@
   .now .t { font-size: calc(44px * var(--dscale)); }
   .now .g { color: var(--slab-muted); font-weight: 600; font-size: 15px; }
   .btn.like { min-height: 72px; font-size: 24px; }
+  .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .three .btn { min-height: 56px; font-size: 16px; padding: 4px 8px; line-height: 1.1; }
+  .three .btn .sub { display: none; }
+  .more { display: flex; flex-direction: column; gap: 14px; }
+  .more > summary { list-style: none; cursor: pointer; }
+  .more > summary::-webkit-details-marker { display: none; }
+  .more[open] > summary { opacity: .8; }
+  .more:not([open]) > :not(summary) { display: none; }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .two:has(#undo.hidden) #skip { grid-column: 1 / -1; }
   .two .btn { flex-direction: column; gap: 2px; min-height: 72px; font-size: 18px; line-height: 1.1; padding: 8px 10px; }
@@ -93,14 +101,15 @@
       <div class="progress"><div id="now-progress"></div></div>
     </div>
     <button id="like" class="btn primary like" data-testid="like">I like this</button>
-    <div class="two">
-      <button id="bored" class="btn" data-testid="bored">Bored of this<span class="sub">Set my old likes aside</span></button>
-      <button id="tonight" class="btn" data-testid="tonight">Tonight only<span class="sub">Try something new</span></button>
+    <div class="three">
+      <button id="bored" class="btn" data-testid="bored">Bored of this</button>
+      <button id="tonight" class="btn" data-testid="tonight">Tonight only</button>
+      <button id="skip" class="btn">Not for me</button>
     </div>
-    <div class="two">
-      <button id="skip" class="btn small">Not for me</button>
-      <button id="undo" class="btn small hidden">Undo "bored"</button>
-    </div>
+    <button id="undo" class="btn small hidden">Undo "bored"</button>
+    <button id="switch-venue" class="btn small" data-testid="checkin-venue-basement">Go to the other venue</button>
+    <details class="more" id="more">
+      <summary class="btn small">Your taste, your night and more</summary>
     <div class="surface card">
       <h2 class="display">Your taste</h2>
       <span id="tonight-state" class="note"></span>
@@ -113,7 +122,6 @@
       <span class="note">Tap the sounds you like.</span>
       <div id="samples"></div>
     </div>
-    <button id="switch-venue" class="btn" data-testid="checkin-venue-basement">Go to the other venue</button>
     <div class="surface card find" id="find">
       <h2 class="display">What was that track?</h2>
       <input id="find-q" type="text" placeholder="Describe it in your own words" autocomplete="off" aria-label="Describe the track in your own words">
@@ -128,7 +136,8 @@
       <h2 class="display">Your taps</h2>
       <div id="taps"></div>
     </div>
-    <button id="checkout" class="btn small">Check out</button>
+      <button id="checkout" class="btn small">Check out</button>
+    </details>
   </section>
 
   <section id="forget-section" class="hidden">

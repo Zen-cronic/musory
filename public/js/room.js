@@ -182,6 +182,10 @@ function feed(words) {
   chip.lastChild.textContent = words;
   el.querySelector(".kicker").after(chip);
   while (el.querySelectorAll(".ev").length > 4) el.querySelector(".ev:last-of-type").remove();
+  // One chip at a time, shown briefly: the room stays calm between events.
+  el.querySelectorAll(".ev.show").forEach((x) => x.classList.remove("show"));
+  chip.classList.add("show");
+  setTimeout(() => chip.classList.remove("show"), 3200);
 }
 const txnWords = (e) => {
   const c = e.counts || {};
@@ -275,7 +279,7 @@ window.addEventListener("lookchange", setQr);
 
 if (!film && !embed) {
   $("menu-slot").replaceWith(lookMenu());
-  $("help-slot").replaceWith(helpPanel([["N", "Play the next track now"], ["H", "Next hour"], ["M", "Sound on or off"], ["?", "Show or hide this panel"]]));
+  $("help-slot").replaceWith(helpPanel([["A", "About this room: crowd memory and controls"], ["N", "Play the next track now"], ["H", "Next hour"], ["M", "Sound on or off"], ["?", "Show or hide this panel"]]));
 }
 if (film || embed) $("start-overlay").classList.add("hidden");
 $("start-room").onclick = () => {
@@ -291,6 +295,10 @@ const toggleSound = () => {
   else if (current) crossfade(current.audio);
 };
 $("sound").onclick = toggleSound;
+const drawer = $("about-drawer");
+$("about-room").onclick = () => { drawer.hidden = !drawer.hidden; settle(); };
+$("about-close").onclick = () => { drawer.hidden = true; settle(); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !drawer.hidden) { drawer.hidden = true; settle(); } if ((e.key === "a" || e.key === "A") && !film && !e.target.closest?.("input, select, textarea")) $("about-room").click(); });
 $("skip").onclick = () => api(`/api/room/${venue}/skip`, {});
 $("next-hour").onclick = () => api("/api/clock/next", {});
 $("read-other").onclick = () => api(`/api/room/${venue}/read-other`, {}).catch(() => {});
