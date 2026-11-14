@@ -18,7 +18,7 @@ const TONIGHT_MS = 8 * 3600_000;
 
 type Hit = { trackId: string; title: string; genre: string; bpm: number; playedAt?: Date | null; ranks: { words?: number; meaning?: number } };
 
-async function embedQuery(q: string): Promise<number[] | null> {
+export async function embedQuery(q: string): Promise<number[] | null> {
   if (!hasVoyage()) return null;
   try {
     const r = await fetch("https://api.voyageai.com/v1/embeddings", {

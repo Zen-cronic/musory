@@ -17,6 +17,7 @@ import { generateFromRoom, hasMusicKey, liveMusicOn, musicState } from "./music.
 import { forgetGraphOn, runForgetGraph, resumePending } from "./forget-graph.js";
 import { findOn, findTrack } from "./find.js";
 import { latestEvals } from "./evals.js";
+import { vibeTap } from "./vibe.js";
 import { byId } from "./catalog.js";
 import { removeClipAudio } from "./expiry.js";
 
@@ -158,6 +159,7 @@ app.get("/api/find", wrap(async (req) => {
   return findTrack(req.query.venue, req.query.q, req.query.mode);
 }));
 app.get("/api/evals/latest", wrap(async () => latestEvals()));
+app.post("/api/vibe", wrap(async (req) => vibeTap(personOf(req.body?.personId), req.body?.text)));
 
 // Room and demo controls
 app.post("/api/room/:venue/skip", wrap(async (req) => {
