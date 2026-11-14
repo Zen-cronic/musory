@@ -49,12 +49,19 @@ function spawn(args: string[], env: Record<string, string> = {}) {
   return { code: r.status, result: line ? JSON.parse(line.slice(7)) : null, err: (r.stderr ?? "").split("\n").filter((l) => l && !l.includes("dotenv")).slice(-3).join(" | ") };
 }
 
+// Checkpoints store state as binary blobs; decode every Binary so an id inside one is still found.
+const readable = (doc: unknown) =>
+  JSON.stringify(doc, function (this: Record<string, unknown>, k, v) {
+    const raw = this[k] as { _bsontype?: string; buffer?: Uint8Array } | undefined; // before toJSON turns a Binary into base64
+    return raw && typeof raw === "object" && raw._bsontype === "Binary" && raw.buffer ? Buffer.from(raw.buffer).toString("latin1") : v;
+  });
+
 async function records(personId: string) {
   const d = await db();
   let n = 0;
   for (const c of await d.listCollections({ type: "collection" }, { nameOnly: true }).toArray()) {
     if (c.name.startsWith("system.")) continue;
-    for (const doc of await d.collection(c.name).find({}).toArray()) if (JSON.stringify(doc).includes(personId)) n++;
+    for (const doc of await d.collection(c.name).find({}).toArray()) if (readable(doc).includes(personId)) n++;
   }
   return n;
 }

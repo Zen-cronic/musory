@@ -99,6 +99,13 @@ async function freshDecision(venue: string, after: number) {
 // Independent of forget's own receipt: read every document in every edmRoom collection
 // (including the LangGraph checkpoints, plays, tombstones and evals) and the recent event feed,
 // and look for the guest's plaintext id anywhere.
+// Checkpoints store state as binary blobs; decode every Binary so an id inside one is still found.
+const readable = (doc: unknown) =>
+  JSON.stringify(doc, function (this: Record<string, unknown>, k, v) {
+    const raw = this[k] as { _bsontype?: string; buffer?: Uint8Array } | undefined; // before toJSON turns a Binary into base64
+    return raw && typeof raw === "object" && raw._bsontype === "Binary" && raw.buffer ? Buffer.from(raw.buffer).toString("latin1") : v;
+  });
+
 async function scanFor(personId: string) {
   const d = await db();
   const hits: Record<string, number> = {};
@@ -108,7 +115,7 @@ async function scanFor(personId: string) {
   for (const [n, docs] of all)
     for (const doc of docs) {
       scanned++;
-      if (JSON.stringify(doc).includes(personId)) hits[n] = (hits[n] ?? 0) + 1;
+      if (readable(doc).includes(personId)) hits[n] = (hits[n] ?? 0) + 1;
     }
   if (JSON.stringify(await api("GET", "/api/recent")).includes(personId)) hits["event feed"] = 1;
   return { scanned, hits };
