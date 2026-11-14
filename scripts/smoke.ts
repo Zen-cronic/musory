@@ -149,7 +149,7 @@ for (const p of ["/api/reset", "/API/RESET", "/api/reset/", "/api/stage/simulate
 // Every sound comes from Atlas: a catalogue track streams from its track document.
 const cat = await fetch(BASE + "/api/audio/t01");
 check("a catalogue track's sound streams from Atlas", cat.status === 200 && cat.headers.get("content-type") === "audio/mpeg" && (await cat.arrayBuffer()).byteLength > 100_000);
-// With live music on: Jess checks in, the room makes a track from her taste, and forget me deletes its sound.
+// With live music on: the demo guest checks in, the room makes a track from her taste, and forget me deletes its sound.
 const cfg = await api("/api/config");
 if (cfg.musicLive) {
   const from = streamed.length;

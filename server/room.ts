@@ -593,7 +593,7 @@ export function guestTag(personId: string): string {
   }
   return h.toString(16).padStart(8, "0");
 }
-const NAMED: Record<string, string> = { "g-jess": "Jess" };
+const NAMED: Record<string, string> = { "g-jess": "Demo guest", "g-demo": "Demo guest" };
 export const guestLabel = (personId: string) => {
   if (NAMED[personId]) return NAMED[personId];
   const sim = /^sim-(\d+)$/.exec(personId);
@@ -1255,9 +1255,9 @@ async function resetInner() {
   return { ok: true };
 }
 
-// Demo seed: one guest, Jess, whose portable taste is techno-heavy from last weekend
+// Demo seed: one demo guest whose portable taste is techno-heavy from last weekend
 // at Pulse Club. She is not checked in anywhere yet, so each scripted step lands the same way every run.
-export const DEMO_GUEST = { id: "g-jess", name: "Jess" };
+export const DEMO_GUEST = { id: "g-jess", name: "Demo guest" };
 export function filmReset() {
   const run = resetChain.then(() => filmInner());
   resetChain = run.catch(() => {});

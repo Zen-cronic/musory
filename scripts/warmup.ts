@@ -1,7 +1,7 @@
 // Warm-up: a few batches of simulated guests (ids sim-11..sim-22) at both venues, so the rooms and the
 // numbers look like an evening in progress. They check in with consent, like samples and live tracks,
 // say "not for me", "bored of this" and "tonight only", and four of them say forget me.
-// Live composition is paused while it runs (no ElevenLabs credits). Jess is never touched.
+// Live composition is paused while it runs (no ElevenLabs credits). The demo guest is never touched.
 // Run on the laptop (room controls are local only): pnpm warmup
 export {};
 const BASE = process.env.BASE || "http://localhost:4377";

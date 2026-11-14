@@ -1,5 +1,5 @@
-// Forget me under demo conditions: Jess checks in, simulated guests move the room, a made track plays,
-// then Jess says forget me. Prints when Copper Bar's now-playing changed and the receipt's own timings.
+// Forget me under demo conditions: the demo guest checks in, simulated guests move the room, a made track plays,
+// then the demo guest says forget me. Prints when Copper Bar's now-playing changed and the receipt's own timings.
 export {};
 const BASE = process.env.BASE || "http://localhost:4377";
 const post = (p: string, b: unknown) => fetch(BASE + p, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.json());

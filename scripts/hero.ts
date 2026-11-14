@@ -1,4 +1,4 @@
-// The live transition, timed: Jess checks in at Copper Bar, then five simulated guests tap a new sound.
+// The live transition, timed: the demo guest checks in at Copper Bar, then five simulated guests tap a new sound.
 // Prints when the room started making a new track, when it arrived, and when it started playing.
 export {};
 const BASE = process.env.BASE || "http://localhost:4377";

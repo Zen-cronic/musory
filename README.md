@@ -98,7 +98,7 @@ pnpm smoke                # end-to-end checks against the running server
 - **Start here:** `http://localhost:4377/` lists the steps. Rooms: `/room/copper`, `/room/basement`. Guest page: `/join/copper`. Proofs: `/proof`.
 - **Phones on the same Wi-Fi:** `pnpm lan` serves on the laptop's LAN address and puts it in the QR codes. Some guest Wi-Fi blocks phone-to-laptop traffic; then open `/p/<guest>` tabs on the laptop.
 - **Database users** are created in Atlas (UI, CLI or Admin API), not by the driver: the app user with `readWrite` and `dbAdmin` on `edmRoom`, and one user per venue with `read` on that venue's View only.
-- **Reset:** `POST /api/reset` (regulars from last weekend), or `POST /api/film/reset` (adds Jess, a guest with techno taste who hasn't checked in yet, and four quiet guests in Copper Bar).
+- **Reset:** `POST /api/reset` (regulars from last weekend), or `POST /api/film/reset` (adds a demo guest with techno taste who hasn't checked in yet, and four quiet guests in Copper Bar).
 - **Live music:** start with `MUSIC_LIVE=1 pnpm start`. Without it, rooms play the catalogue only.
 - **Room controls** (reset, skip, simulated guests, proofs) work only from the laptop itself; through a tunnel or from another device they return 403.
 
