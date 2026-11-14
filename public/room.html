@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Musory · Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/base.css">
+<style>
+  body { padding: 24px; }
+  .grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; }
+  #venue-name { font-size: 56px; margin: 0 0 12px; }
+  #now-title { font-size: 64px; margin: 6px 0; }
+  #next-title { font-size: 32px; margin: 4px 0; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  #qr { width: 180px; height: 180px; background: var(--paper); }
+  #start-overlay { position: fixed; inset: 0; background: rgba(17,17,17,0.92); display: grid; place-items: center; z-index: 20; }
+  #receipt { position: fixed; inset: 10% 15%; z-index: 30; padding: 32px; }
+  #receipt .count { font-size: 120px; font-weight: 900; color: var(--band); font-family: var(--mono); }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } #now-title { font-size: 40px; } }
+</style>
+</head>
+<body>
+<div id="start-overlay"><button id="start-room" class="primary big" style="font-size:32px;padding:24px 36px">Start the room</button></div>
+<div class="grid">
+  <section>
+    <h1 id="venue-name" class="big">…</h1>
+    <div class="card">
+      <div class="label">Now playing <span id="now-clock" class="mono"></span></div>
+      <h2 id="now-title" class="big" data-track-id="">…</h2>
+      <div id="now-meta" class="mono mute">…</div>
+      <div class="progress" style="margin-top:12px"><div id="now-progress"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="label">Next</div>
+      <h3 id="next-title" class="big" data-track-id="">…</h3>
+      <div id="next-why" class="mute"></div>
+      <div class="row" style="margin-top:10px">
+        <div>With memory: <b id="with-memory" class="mono">…</b></div>
+        <div>No-memory pick: <b id="without-memory" class="mono">…</b></div>
+      </div>
+      <div id="candidates" class="mono mute" style="font-size:12px;margin-top:8px"></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="label">Room mix (what the next pick is aimed at)</div>
+      <div id="mix" class="bars"></div>
+    </div>
+  </section>
+  <aside>
+    <div class="card row" style="align-items:flex-start">
+      <img id="qr" alt="QR code to check in to this venue">
+      <div>
+        <div class="label">Scan to check in</div>
+        <div id="join-url" class="mono" style="font-size:12px;word-break:break-all"></div>
+        <div style="margin-top:12px"><span class="label">Guests here</span><div id="present" class="big" style="font-size:48px">0</div></div>
+        <div id="tonight" class="mono"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="label">This venue's crowd memory, read with <span id="memory-login" class="mono"></span></div>
+      <div id="memory"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="read-other">Try reading the other venue's crowd memory</button>
+      </div>
+      <div id="refusals"></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="label">Live from the database (change streams)</div>
+      <div id="feed" class="feed"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="skip">Play next now</button>
+      <button id="next-hour">Next hour</button>
+      <button id="sound">Sound: on</button>
+      <a href="/proof">Proof</a>
+    </div>
+  </aside>
+</div>
+<div id="receipt" class="card hidden"></div>
+<audio id="audio-a" preload="auto"></audio><audio id="audio-b" preload="auto"></audio>
+<script type="module" src="/js/room.js"></script>
+</body>
+</html>

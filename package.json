@@ -1,0 +1,30 @@
+{
+  "name": "musory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A venue's music follows the people in the room, with their consent. Each venue's crowd memory stays private, and forget me removes you from every venue.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "setup:db": "tsx scripts/setup-db.ts",
+    "setup:vector": "tsx scripts/setup-vector.ts",
+    "start": "tsx server/index.ts",
+    "lan": "LAN=1 tsx server/index.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "typecheck": "tsc --noEmit",
+    "stop": "lsof -t -iTCP:${PORT:-4377} -sTCP:LISTEN | xargs kill 2>/dev/null || true"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "mongodb": "7.9.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

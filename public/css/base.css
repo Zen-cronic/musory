@@ -1,0 +1,27 @@
+:root {
+  --ink: #111111; --slab: #1e1e1c; --line: #3a3a36; --paper: #f4f1ea; --mute: #a3a099; --band: #ff5b14;
+  --display: "Archivo", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--paper); font-family: var(--display); }
+a { color: var(--paper); }
+button { font: inherit; cursor: pointer; border: 2px solid var(--paper); background: transparent; color: var(--paper); padding: 12px 16px; font-weight: 700; }
+button.primary { background: var(--paper); color: var(--ink); }
+button.band { background: var(--band); border-color: var(--band); color: var(--ink); }
+button:disabled { opacity: 0.4; cursor: default; }
+.hidden { display: none !important; }
+.mono { font-family: var(--mono); }
+.mute { color: var(--mute); }
+.card { background: var(--slab); border: 1px solid var(--line); padding: 16px; }
+.label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); font-weight: 700; }
+.big { font-weight: 900; text-transform: uppercase; letter-spacing: -0.01em; line-height: 0.95; }
+.bars .bar { display: grid; grid-template-columns: 110px 1fr 44px; gap: 8px; align-items: center; margin: 4px 0; font-size: 14px; }
+.bars .fill { height: 10px; background: var(--paper); }
+.bars .bar:first-child .fill { background: var(--band); }
+.ticket { background: var(--paper); color: var(--ink); padding: 12px 14px; margin: 8px 0; }
+.ticket .code { font-family: var(--mono); color: var(--band); font-weight: 700; }
+.feed { font-family: var(--mono); font-size: 12px; max-height: 260px; overflow: auto; }
+.feed div { padding: 2px 0; border-bottom: 1px solid var(--line); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--paper); color: var(--ink); padding: 10px 18px; border-radius: 999px; font-weight: 700; z-index: 10; }
+.progress { height: 4px; background: var(--line); }
+.progress > div { height: 100%; width: 0; background: var(--band); }

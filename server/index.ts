@@ -1,0 +1,196 @@
+import "dotenv/config";
+import express from "express";
+import path from "node:path";
+import os from "node:os";
+import { fileURLToPath } from "node:url";
+import QRCode from "qrcode";
+import { db, redactError, isVenue, VENUES, VENUE_IDS, TAPS, DERIVED, PRESENCE, CONSENTS, SESSIONS, PREFS, PLAYS, TOMBSTONES, type VenueId } from "./db.js";
+import { subscribe, emit, recentEvents, clientCount } from "./events.js";
+import {
+  HttpError, fail, loadTracks, startPlayer, resetAndSeed, roomState, me, personOf, checkin, checkout, tap, bored, undoBored,
+  startTonight, endTonight, keepTonightTap, forget, proof, headline, nextHour, clockState, advance, playView, rooms, guestLabel,
+  emitPresence, scheduleRefresh, crossVenueRead, withoutYou,
+} from "./room.js";
+import { generateFromRoom, hasMusicKey } from "./music.js";
+import { byId } from "./catalog.js";
+
+// "Start your taste": one short sample per sound, so a new guest can say what they like in one tap.
+const SAMPLES = ["t13", "t10", "t17", "t15", "t08", "t05"];
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const app = express();
+app.use(express.json({ limit: "32kb" }));
+app.use(express.static(path.join(root, "public")));
+
+const LAN = process.env.LAN === "1";
+const port = Number(process.env.PORT || 4377);
+function lanIp(): string | null {
+  for (const list of Object.values(os.networkInterfaces()))
+    for (const a of list ?? []) if (a.family === "IPv4" && !a.internal) return a.address;
+  return null;
+}
+/** The address phones should open: a public URL when deployed, the laptop's LAN address in LAN mode. */
+function baseUrl(req: express.Request): string {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, "");
+  if (LAN) {
+    const ip = lanIp();
+    if (ip) return `http://${ip}:${port}`;
+  }
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+const venueOf = (v: unknown): VenueId => {
+  if (!isVenue(v)) throw fail(404, "Unknown venue");
+  return v;
+};
+const wrap =
+  (fn: (req: express.Request) => Promise<unknown>) => async (req: express.Request, res: express.Response) => {
+    try {
+      res.json(await fn(req));
+    } catch (e) {
+      const status = e instanceof HttpError ? e.status : 500;
+      const s = redactError(e);
+      if (status >= 500) console.error("request failed:", req.path, s.codeName ?? "", s.message.slice(0, 200));
+      res.status(status).json({ error: s });
+    }
+  };
+
+// Pages
+const page = (file: string) => (_req: express.Request, res: express.Response) => res.sendFile(path.join(root, "public", file));
+app.get("/", page("start.html"));
+app.get("/start", page("start.html"));
+app.get("/room/:venue", page("room.html"));
+app.get("/join/:venue", page("phone.html"));
+app.get("/me", page("phone.html"));
+app.get("/join", page("phone.html"));
+app.get("/p/:guest", page("phone.html"));
+app.get("/proof", page("proof.html"));
+
+// Stream
+app.get("/events", (req, res) => subscribe(res));
+app.get("/api/recent", (_req, res) => res.json(recentEvents()));
+
+// Read
+app.get("/api/config", (req, res) =>
+  res.json({
+    baseUrl: baseUrl(req),
+    lan: LAN,
+    stage: process.env.STAGE === "1",
+    music: hasMusicKey(),
+    venues: VENUE_IDS.map((v) => ({ id: v, name: VENUES[v].name, view: VENUES[v].view })),
+    clock: clockState(),
+  }),
+);
+app.get("/api/qr", async (req, res) => {
+  try {
+    const venue = venueOf(req.query.venue);
+    const url = `${baseUrl(req)}/join/${venue}`;
+    const svg = await QRCode.toString(url, { type: "svg", margin: 1, color: { dark: "#111111", light: "#F4F1EA" } });
+    res.type("image/svg+xml").send(svg);
+  } catch (e) {
+    res.status(404).send(String((e as Error).message));
+  }
+});
+app.get("/api/room/:venue", wrap(async (req) => roomState(venueOf(req.params.venue))));
+app.get("/api/me", wrap(async (req) => me(personOf(req.query.personId))));
+app.get("/api/number", wrap(async () => headline()));
+app.get("/api/without", wrap(async (req) => withoutYou(personOf(req.query.personId))));
+
+// Guest actions
+app.post("/api/checkin", wrap(async (req) => checkin(personOf(req.body?.personId), venueOf(req.body?.venueId), Array.isArray(req.body?.scopes) ? req.body.scopes.map(String) : ["use_taste", "contribute_crowd"])));
+app.post("/api/checkout", wrap(async (req) => checkout(personOf(req.body?.personId))));
+app.post("/api/tap", wrap(async (req) => tap(personOf(req.body?.personId), Number(req.body?.signal) < 0 ? -1 : 1, req.body?.trackId ? String(req.body.trackId) : undefined)));
+app.get("/api/samples", (_req, res) => res.json(SAMPLES.map((id) => ({ trackId: id, ...byId.get(id) }))));
+app.post("/api/bored", wrap(async (req) => bored(personOf(req.body?.personId))));
+app.post("/api/bored/undo", wrap(async (req) => undoBored(personOf(req.body?.personId), String(req.body?.prefId ?? ""))));
+app.post("/api/tonight/start", wrap(async (req) => startTonight(personOf(req.body?.personId))));
+app.post("/api/tonight/end", wrap(async (req) => endTonight(personOf(req.body?.personId))));
+app.post("/api/tonight/keep", wrap(async (req) => keepTonightTap(personOf(req.body?.personId), String(req.body?.tapId ?? ""))));
+app.post("/api/forget", wrap(async (req) => forget(personOf(req.body?.personId))));
+
+// Room and demo controls
+app.post("/api/room/:venue/skip", wrap(async (req) => {
+  const v = venueOf(req.params.venue);
+  await advance(v);
+  return { play: playView(v) };
+}));
+app.post("/api/room/:venue/generate", wrap(async (req) => generateFromRoom(venueOf(req.params.venue))));
+app.post("/api/room/:venue/read-other", wrap(async (req) => {
+  const v = venueOf(req.params.venue);
+  return crossVenueRead(v, v === "copper" ? "basement" : "copper");
+}));
+app.post("/api/clock/next", wrap(async () => nextHour()));
+app.post("/api/proof/:name", wrap(async (req) => proof(String(req.params.name), req.body?.personId ? personOf(req.body.personId) : undefined)));
+app.post("/api/reset", wrap(async () => resetAndSeed()));
+app.post("/api/volunteer", wrap(async (req) => {
+  const v = venueOf(req.body?.venueId);
+  const d = await db();
+  const guests = await d.collection(PRESENCE).find({ venueId: v, personId: { $not: /^g-(kofi|ines|rhys|noor|tomasz|adaeze|yusuf|hana)$/ } }).toArray();
+  if (!guests.length) throw fail(409, "No guests checked in yet.");
+  const pick = guests[Math.floor(Math.random() * guests.length)];
+  emit("volunteer", { venueId: v, personId: pick.personId, label: guestLabel(String(pick.personId)) });
+  return { label: guestLabel(String(pick.personId)) };
+}));
+app.get("/api/health", (_req, res) => res.json({ ok: true, clients: clientCount(), rooms: VENUE_IDS.map((v) => ({ v, play: rooms[v].play?.trackId })) }));
+
+// Change streams: rooms and screens are driven by what the database commits.
+async function watch() {
+  const d = await db();
+  const colls = [TAPS, DERIVED, PRESENCE, CONSENTS, SESSIONS, PREFS, PLAYS, TOMBSTONES];
+  for (const coll of colls) {
+    const start = () => {
+      const cs = d.collection(coll).watch([], { fullDocument: coll === DERIVED || coll === PLAYS ? "updateLookup" : undefined });
+      cs.on("change", (ch) => {
+        const c = ch as { operationType: string; fullDocument?: Record<string, any>; documentKey?: { _id: unknown } };
+        // A guest left a room (checked out, moved, or their presence expired): that room re-mixes.
+        if (coll === PRESENCE && c.operationType === "delete") {
+          const v = String(c.documentKey?._id ?? "").split("|")[0];
+          if (isVenue(v)) {
+            void emitPresence(v);
+            void scheduleRefresh(v);
+          }
+        }
+        const doc = c.fullDocument;
+        // Nothing that names a guest leaves the server: collection, operation, venue and kind only.
+        emit("change_event", {
+          coll,
+          op: c.operationType,
+          venueId: doc?.venueId ?? null,
+          kind: doc?.kind ?? null,
+          scope: doc?.scope ?? null,
+          signal: doc?.signal ?? null,
+          at: Date.now(),
+        });
+        if (coll === PLAYS && c.operationType === "insert" && doc && isVenue(doc.venueId)) emit("play", { venueId: doc.venueId, play: playView(doc.venueId) });
+        if (coll === DERIVED && doc?.kind === "decision" && c.operationType === "insert") {
+          const { derivedFrom, ...rest } = doc;
+          emit("next", { venueId: doc.venueId, decision: rest });
+        }
+        if (coll === DERIVED && doc?.kind === "crowd")
+          emit("crowd", { venueId: doc.venueId, contributors: doc.distinctContributors, weights: doc.weights });
+      });
+      cs.on("error", (e) => {
+        console.error("change stream error", coll, redactError(e).message);
+        setTimeout(start, 2000);
+      });
+    };
+    start();
+  }
+}
+
+const host = LAN || process.env.PUBLIC_BASE_URL ? "0.0.0.0" : "127.0.0.1";
+app.listen(port, host, async () => {
+  console.log(`Musory on http://localhost:${port}/`);
+  if (LAN) console.log(`LAN mode: phones open http://${lanIp()}:${port}/`);
+  try {
+    await loadTracks();
+    await watch();
+    console.log("change streams on");
+    const d = await db();
+    startPlayer();
+    if (!(await d.collection(PLAYS).countDocuments({}))) await resetAndSeed();
+    console.log("rooms playing");
+  } catch (e) {
+    console.error("startup failed", redactError(e).message);
+  }
+});
