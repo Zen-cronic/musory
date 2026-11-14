@@ -155,11 +155,27 @@ async function runScenario(inp: Record<string, any>) {
     crossVenue = await api("POST", "/api/proof/cross-venue");
     ownVenue = await api("POST", "/api/proof/own-venue");
   }
+  // Composed clips built from this guest (the same $graphLookup walk forget uses), and whether each one's
+  // audio is served before forget; after forget each must 404 (audio stored in the clip document).
+  const d0 = await db();
+  const [walk] = await d0
+    .collection("taps")
+    .aggregate([
+      { $match: { personId } },
+      { $group: { _id: null, ids: { $push: "$_id" } } },
+      { $graphLookup: { from: "derived", startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure" } },
+      { $project: { clips: { $filter: { input: "$closure", as: "n", cond: { $eq: ["$$n.kind", "clip"] } } } } },
+    ])
+    .toArray();
+  const clipIds = ((walk?.clips ?? []) as { _id: unknown }[]).map((c) => String(c._id));
+  const status = async (id: string) => (await fetch(`${BASE}/api/clip/${id}`).catch(() => null))?.status ?? 0;
+  const clipsBefore = await Promise.all(clipIds.map(status));
   const tForget = Date.now();
   const receipt = await api("POST", "/api/forget", { personId });
   const forgetMs = Date.now() - tForget;
   const meAfter = await api("GET", `/api/me?personId=${personId}`);
   const scan = await scanFor(personId);
+  const clipsAfter = await Promise.all(clipIds.map(status));
   return {
     personId,
     ms: Date.now() - t0,
@@ -181,6 +197,7 @@ async function runScenario(inp: Record<string, any>) {
     crossVenue: crossVenue ? { ok: crossVenue.ok, code: crossVenue.error?.code ?? null } : null,
     ownVenue: ownVenue ? { ok: ownVenue.ok } : null,
     scan,
+    clips: { ids: clipIds.length, servedBefore: clipsBefore.filter((x) => x === 200).length, notFoundAfter: clipsAfter.filter((x) => x === 404).length },
     receipt: {
       totalBefore: receipt.totalBefore,
       totalAfter: receipt.totalAfter,
@@ -224,6 +241,14 @@ const guaranteeEvaluators = ([
           score: outputs.crossVenue.ok === false && outputs.crossVenue.code === 13 && outputs.ownVenue?.ok === true ? 1 : 0,
           comment: `checked once per run: cross-venue read -> ${outputs.crossVenue.code}; own venue ok ${outputs.ownVenue?.ok}`,
         },
+  ({ outputs }: any) =>
+    !outputs.clips || outputs.clips.servedBefore === 0
+      ? na()
+      : {
+          key: "composed_clips_gone",
+          score: outputs.clips.notFoundAfter === outputs.clips.ids ? 1 : 0,
+          comment: `${outputs.clips.ids} clips composed from this guest; served before ${outputs.clips.servedBefore}; 404 after ${outputs.clips.notFoundAfter}`,
+        },
   ({ outputs, inputs }: any) =>
     inputs.consent !== "none"
       ? na()
@@ -248,7 +273,7 @@ const guaranteeEvaluators = ([
           comment: outputs.receipt.venues.map((v: any) => `${v.venueId}: with ${v.pickBefore} / without ${v.pickWithoutYou}`).join("; "),
         },
 ] as ((a: any) => any)[]).map((f) => (a: any) => (a.outputs?.receipt ? f(a) : na()));
-const PASS_FAIL = ["no_trace_left", "forget_zero_records", "forget_matches_pick_without_you", "tonight_never_in_taste", "venue_b_refused", "no_consent_no_influence"];
+const PASS_FAIL = ["no_trace_left", "composed_clips_gone", "forget_zero_records", "forget_matches_pick_without_you", "tonight_never_in_taste", "venue_b_refused", "no_consent_no_influence"];
 
 // Find that track: words only, meaning only, and both fused, over the whole catalogue.
 // Two hand-written sets, both written before any run: "literal" reuses words from the track's
