@@ -881,6 +881,7 @@ async function forgetInner(personId: string) {
   let clipIds: ObjectId[] = [];
   const crowdAfter: Partial<Record<VenueId, number>> = {};
   const t0 = Date.now();
+  const txnStartAt = t0 - tStart;
   await c.withSession((session) =>
     session.withTransaction(async () => {
       // Everything built from this guest's taps, at any depth: taste, crowd memories, decisions.
@@ -890,7 +891,14 @@ async function forgetInner(personId: string) {
           [
             { $match: { personId } },
             { $group: { _id: null, ids: { $push: "$_id" } } },
-            { $graphLookup: { from: DERIVED, startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure", depthField: "depth" } },
+            // Only the copies that hold this guest's influence: taste, crowd memory, composed tracks. The room's
+            // decision log (one record per pick) is unlinked separately by taste id, so the walk stays small.
+            {
+              $graphLookup: {
+                from: DERIVED, startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure", depthField: "depth",
+                maxDepth: 1, restrictSearchWithMatch: { kind: { $in: ["taste", "crowd", "clip", "venue_card"] } },
+              },
+            },
             { $project: { closure: { _id: 1, kind: 1, venueId: 1, depth: 1 } } },
           ],
           { session },
@@ -939,6 +947,7 @@ async function forgetInner(personId: string) {
     }),
   );
   const txnMs = Date.now() - t0;
+  const committedAt = Date.now() - tStart;
   cfMs = await cfP;
   for (const id of clipIds) {
     const hex = id.toHexString();
@@ -983,7 +992,7 @@ async function forgetInner(personId: string) {
   }
   const receipt = {
     before: before.counts, totalBefore: before.total, totalAfter: after.total, graph, composedClipsRemoved: clipIds.length, txnMs,
-    timing: { counterfactualMs: cfMs, txnMs, roomChangeMs, verifyMs, totalMs: Date.now() - tStart }, venues, at: new Date(),
+    timing: { snapshotDoneAt: txnStartAt, txnMs, committedAt, counterfactualDoneAt: cfMs, roomChangeMs, verifyMs, totalMs: Date.now() - tStart }, venues, at: new Date(),
   };
   for (const v of VENUE_IDS) void scheduleRefresh(v, 0);
   await d.collection(TOMBSTONES).updateOne({ hmac: hmac(personId) }, { $set: { venues: venues.map((v) => ({ venueId: v.venueId, matchesWithoutYou: v.matchesWithoutYou })) } });
