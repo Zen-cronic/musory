@@ -73,6 +73,45 @@
   .find .result { display: grid; gap: 2px; padding: 10px 12px; box-shadow: inset 0 0 0 2px currentColor; }
   .find .result b { font-size: 20px; }
   [data-film] .find { display: none !important; }
+  .swipe-wrap { position: relative; touch-action: pan-y; }
+  .swipe-card { position: relative; padding: 18px 16px; gap: 6px; cursor: grab; user-select: none; transition: transform .2s var(--ease); }
+  .swipe-card.dragging { transition: none; cursor: grabbing; }
+  .swipe-card .hint { font-size: 13px; color: var(--slab-muted); margin-top: 4px; }
+  .stamp { position: absolute; top: 14px; padding: 4px 10px; font-weight: 900; font-stretch: 75%; text-transform: uppercase; font-size: 22px; opacity: 0; border: 3px solid currentColor; }
+  .stamp-like { right: 14px; color: var(--band); }
+  .stamp-skip { left: 14px; color: #FFFFFF; }
+  .actions { display: flex; justify-content: center; gap: 28px; }
+  .round { width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 0; border: 3px solid currentColor; background: transparent; font-weight: 800; }
+  .round span { font-size: 30px; line-height: 1; }
+  .round b { font-size: 13px; }
+  .round.like { background: var(--band-bg, var(--band)); color: var(--on-band); border-color: transparent; }
+  .vibe label h2 { font-size: calc(22px * var(--dscale)); }
+  .vibe form { display: flex; gap: 8px; }
+  .vibe input { flex: 1; font: inherit; font-size: 17px; min-height: 48px; padding: 0 12px; border: 2px solid currentColor; background: var(--surface); color: var(--text); }
+  .more > summary { list-style: none; cursor: pointer; }
+  .more > summary::-webkit-details-marker { display: none; }
+  .more:not([open]) .sheet { display: none; }
+  .more[open] .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; z-index: 30; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); display: grid; gap: 12px; background: var(--bg); background-image: var(--fields, none); box-shadow: 0 -2px 0 var(--slab-line); }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; }
+  .sheet-head h2 { font-size: 28px; }
+  .btn.toggle[aria-pressed="true"] { background: var(--on-bg); color: var(--bg); }
+  .snackbar { position: fixed; left: 16px; right: 16px; bottom: 18px; z-index: 35; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: var(--on-bg); color: var(--bg); font-weight: 700; }
+  .snackbar .btn { border-color: currentColor; min-height: 44px; }
+  .forgetting { position: fixed; inset: 0; z-index: 19; padding: 22px 18px; display: flex; flex-direction: column; gap: 18px; background: var(--bg); background-image: var(--fields, none); }
+  .forgetting h1 { font-size: calc(48px * var(--dscale)); }
+  .checks { list-style: none; display: grid; gap: 14px; font-size: 18px; font-weight: 700; }
+  .checks li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: center; color: var(--on-bg-muted); }
+  .checks li i { width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--slab-line); border-top-color: var(--band); animation: spin 1s linear infinite; }
+  .checks li.wait i { animation: none; border-color: var(--slab-line); }
+  .checks li.done { color: var(--on-bg); }
+  .checks li.done i { animation: none; border: 0; background: var(--band-bg, var(--band)); position: relative; }
+  .checks li.done i::after { content: ""; position: absolute; left: 9px; top: 5px; width: 6px; height: 12px; border: solid var(--on-band); border-width: 0 3px 3px 0; transform: rotate(45deg); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .exits { display: grid; gap: 10px; margin-top: 6px; }
+  .exits p { font-size: 14px; font-weight: 600; }
+  .back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 800; color: var(--on-band); text-decoration: none; }
+  @media (prefers-reduced-motion: reduce) { .swipe-card { transition: none; } .checks li i { animation: none; } }
+
 </style>
 </head>
 <body>
@@ -94,22 +133,35 @@
   </section>
 
   <section id="main" class="hidden">
-    <div class="slab now">
-      <span class="kicker">Now playing</span>
-      <h2 id="now-title" class="display t" data-track-id="">…</h2>
-      <span id="now-meta" class="g"></span>
-      <div class="progress"><div id="now-progress"></div></div>
+    <div class="swipe-wrap">
+      <div class="slab now swipe-card" id="swipe-card" data-testid="swipe-card" tabindex="0" aria-label="Now playing. Swipe right to like, left to skip.">
+        <span class="stamp stamp-like" aria-hidden="true">Like</span><span class="stamp stamp-skip" aria-hidden="true">Skip</span>
+        <span class="kicker">Now playing</span>
+        <h2 id="now-title" class="display t" data-track-id="">…</h2>
+        <span id="now-meta" class="g"></span>
+        <div class="progress"><div id="now-progress"></div></div>
+        <span class="hint">Swipe right to like, left to skip</span>
+      </div>
     </div>
-    <button id="like" class="btn primary like" data-testid="like">I like this</button>
-    <div class="three">
-      <button id="bored" class="btn" data-testid="bored">Bored of this</button>
-      <button id="tonight" class="btn" data-testid="tonight">Tonight only</button>
-      <button id="skip" class="btn">Not for me</button>
+    <div class="actions">
+      <button id="skip" class="round skip" data-testid="skip" aria-label="Skip"><span aria-hidden="true">✕</span><b>Skip</b></button>
+      <button id="like" class="round like" data-testid="like" aria-label="Like"><span aria-hidden="true">♥</span><b>Like</b></button>
     </div>
-    <button id="undo" class="btn small hidden">Undo "bored"</button>
-    <button id="switch-venue" class="btn small" data-testid="checkin-venue-basement">Go to the other venue</button>
+    <div class="surface card vibe" id="vibe">
+      <label for="vibe-q"><h2 class="display">Tell the room what you want</h2></label>
+      <form id="vibe-form" autocomplete="off">
+        <input id="vibe-q" type="text" maxlength="120" placeholder="something dark and driving" aria-label="Tell the room what you want">
+        <button id="vibe-send" class="btn small" type="submit">Send</button>
+      </form>
+      <div id="vibe-result" class="note"></div>
+    </div>
     <details class="more" id="more">
-      <summary class="btn small">Your taste, your night and more</summary>
+      <summary class="btn small">More</summary>
+      <div class="sheet" role="dialog" aria-label="More">
+        <div class="sheet-head"><h2 class="display">More</h2><button type="button" class="btn small" id="more-close">Close</button></div>
+        <button id="bored" class="btn" data-testid="bored">Play something different</button>
+        <button id="tonight" class="btn toggle" data-testid="tonight" aria-pressed="false">Only count my likes tonight</button>
+        <button id="switch-venue" class="btn" data-testid="checkin-venue-basement">Switch venue</button>
     <div class="surface card">
       <h2 class="display">Your taste</h2>
       <span id="tonight-state" class="note"></span>
@@ -118,17 +170,9 @@
       <span id="taste-version" class="note"></span>
     </div>
     <div class="surface card">
-      <h2 class="display">Start your taste</h2>
-      <span class="note">Tap the sounds you like.</span>
-      <div id="samples"></div>
-    </div>
-    <div class="surface card vibe hidden" id="vibe">
-      <h2 class="display">Tell the room what you want</h2>
-      <form id="vibe-form" autocomplete="off">
-        <input id="vibe-q" type="text" maxlength="120" placeholder="something dark and driving" aria-label="Tell the room what you want">
-        <button id="vibe-send" class="btn small" type="submit">Send</button>
-      </form>
-      <div id="vibe-result" class="note"></div>
+      <h2 class="display">Your night</h2>
+      <span class="note">What played while you were here.</span>
+      <div id="night"></div>
     </div>
     <div class="surface card find" id="find">
       <h2 class="display">What was that track?</h2>
@@ -136,16 +180,18 @@
       <div id="find-result"></div>
     </div>
     <div class="surface card">
-      <h2 class="display">Your night</h2>
-      <span class="note">What played while you were here.</span>
-      <div id="night"></div>
+      <h2 class="display">Start your taste</h2>
+      <span class="note">Tap the sounds you like.</span>
+      <div id="samples"></div>
     </div>
     <div class="surface card">
       <h2 class="display">Your taps</h2>
       <div id="taps"></div>
     </div>
-      <button id="checkout" class="btn small">Check out</button>
+        <button id="checkout" class="btn small">Check out</button>
+      </div>
     </details>
+    <div class="snackbar hidden" id="snackbar" role="status"><span id="snack-text"></span><button id="undo" class="btn small hidden" type="button">Undo</button></div>
   </section>
 
   <section id="forget-section" class="hidden">
@@ -166,6 +212,16 @@
     <button id="forget-big" class="btn forget like" style="min-height:120px;font-size:34px">Forget me</button>
   </section>
 </main>
+<section id="forgetting" class="forgetting hidden" aria-live="polite">
+  <span class="wordmark">Musory</span>
+  <h1 class="display">Forgetting you</h1>
+  <ol class="checks">
+    <li id="fg-1"><i></i><span>Deleting your likes and taste</span></li>
+    <li id="fg-2"><i></i><span>Done at Copper Bar and Pulse Club</span></li>
+    <li id="fg-3"><i></i><span>Tracks made from your taste deleted</span></li>
+    <li id="fg-4"><i></i><span>Each room now chooses without you</span></li>
+  </ol>
+</section>
 <section id="receipt" class="flood receipt-screen hidden" data-testid="receipt"></section>
 <script type="module" src="/js/phone.js"></script>
 </body>

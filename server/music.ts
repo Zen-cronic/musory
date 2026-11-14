@@ -41,16 +41,18 @@ const leadingOf = (mix: Record<string, number> = {}) => Object.entries(mix).sort
 
 /** Two sections at the room's current tempo: a short lead-in from the current sound, then the crowd's new sound. */
 export function planFor(fromGenre: string, toGenres: string[], bpm: number, leadStyles?: string[]) {
+  // One simple 15 s section led by the room's top sound: a clear, steady beat with few layers.
   const to = toGenres[0] ?? "house";
-  const second = toGenres[1];
-  const main = leadStyles?.length ? [to, ...leadStyles] : stylesFor(to);
   const chunks = [
-    { text: "[Lead-in]", duration_ms: 4000, positive_styles: [...stylesFor(fromGenre).slice(0, 3), to, `${bpm} BPM`], negative_styles: ["vocals", "spoken word"] },
     {
-      text: "[New groove]",
-      duration_ms: CLIP_MS - 4000,
-      positive_styles: [...main, ...(second ? [`hints of ${second}`] : []), `${bpm} BPM`],
-      negative_styles: ["vocals", "spoken word"],
+      text: "[Groove]",
+      duration_ms: CLIP_MS,
+      positive_styles: [
+        to,
+        ...(leadStyles ?? []).slice(0, 2),
+        "clean four-on-the-floor kick", "simple bassline", "minimal layers", "clear steady groove", "instrumental", `${bpm} BPM`,
+      ],
+      negative_styles: ["vocals", "busy percussion", "many layers", "abrupt changes", "distortion", "ambient wash"],
     },
   ];
   return { descriptors: { from: fromGenre, genres: toGenres, bpm }, plan: { chunks } };
