@@ -933,7 +933,7 @@ async function forgetInner(personId: string) {
         }
       }
       await d.collection(TOMBSTONES).insertOne(
-        { hmac: hmac(personId), at: new Date(), removed: before.counts, venuesRebuilt: crowdVenues },
+        { hmac: hmac(personId), at: new Date(), removed: before.counts, venuesRebuilt: crowdVenues, ...(personId.startsWith("sim-") ? { simulated: true } : {}) },
         { session },
       );
     }),
@@ -1180,6 +1180,7 @@ export async function headline() {
   ].map(String));
   const leftovers = [...ids].filter((id) => forgotten.has(hmac(id))).length;
   const checks = tombstones.flatMap((t) => (t.venues ?? []) as { matchesWithoutYou: boolean }[]);
+  const simulated = [...ids].filter((id) => id.startsWith("sim-")).length + tombstones.filter((t) => t.simulated).length;
   return {
     picks: withMemory.length,
     picksChangedByMemory: changed,
@@ -1187,7 +1188,9 @@ export async function headline() {
     recordsLeftForForgottenGuests: leftovers,
     roomPicksMatchingWithoutThem: checks.filter((c) => c.matchesWithoutYou).length,
     roomPicksChecked: checks.length,
+    includesSimulated: simulated > 0,
     sentence:
+      (simulated > 0 ? "Tonight, including simulated guests: " : "") +
       `${changed} of ${withMemory.length} picks tonight differ from the no-memory pick. ` +
       `${tombstones.length} guest(s) said forget me: ${leftovers} records left, and ${checks.filter((c) => c.matchesWithoutYou).length} of ${checks.length} room picks match the pick without them.`,
   };

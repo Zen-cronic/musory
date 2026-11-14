@@ -13,7 +13,7 @@ import {
   startTonight, endTonight, keepTonightTap, forget, proof, headline, nextHour, clockState, advance, playView, rooms, guestLabel,
   emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset, guestTag, STAGE, simulateGuests, dropQueuedClip, clearLoadGuests,
 } from "./room.js";
-import { generateFromRoom, hasMusicKey, liveMusicOn, musicState } from "./music.js";
+import { generateFromRoom, hasMusicKey, liveMusicOn, musicState, pauseMusic } from "./music.js";
 import { forgetGraphOn, runForgetGraph, resumePending } from "./forget-graph.js";
 import { findOn, findTrack } from "./find.js";
 import { latestEvals } from "./evals.js";
@@ -196,6 +196,7 @@ app.post("/api/stage/base-url", wrap(async (req) => {
   publicBase = url;
   return { baseUrl: publicBase || null };
 }));
+app.post("/api/stage/music-pause", wrap(async (req) => pauseMusic(Number(req.body?.seconds ?? 90))));
 app.post("/api/stage/clear-load", wrap(async () => clearLoadGuests()));
 app.post("/api/stage/simulate", wrap(async (req) => simulateGuests(venueOf(req.body?.venueId ?? "copper"), req.body?.genre ? String(req.body.genre) : undefined)));
 let ready = false; // true once tracks are loaded, change streams are on and the rooms are playing

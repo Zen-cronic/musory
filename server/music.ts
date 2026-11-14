@@ -195,8 +195,14 @@ setComposingCheck((v) => busy.has(v));
 
 // The trigger: a new pick whose leading sound differs from what the room is playing starts a composition
 // right away, in parallel with the current clip.
+// Warm-up runs pause live composition so they don't spend the daily cap.
+let pausedUntil = 0;
+export const pauseMusic = (seconds: number) => {
+  pausedUntil = Date.now() + Math.max(0, Math.min(600, seconds)) * 1000;
+  return { pausedUntil: new Date(pausedUntil) };
+};
 setDecisionHook((venueId, decision) => {
-  if (!liveMusicOn() || !hasMusicKey()) return;
+  if (!liveMusicOn() || !hasMusicKey() || Date.now() < pausedUntil) return;
   // Simulated guests always get a fresh track (no gap, no same-sound check; the daily cap still applies).
   const soon = composeSoon.has(venueId);
   if (busy.has(venueId)) {

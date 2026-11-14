@@ -9,6 +9,7 @@
     "setup:db": "tsx scripts/setup-db.ts",
     "setup:vector": "tsx scripts/setup-vector.ts",
     "setup:audio": "tsx scripts/setup-audio.ts",
+    "warmup": "tsx scripts/warmup.ts",
     "start": "tsx server/index.ts",
     "lan": "LAN=1 tsx server/index.ts",
     "smoke": "tsx scripts/smoke.ts",
