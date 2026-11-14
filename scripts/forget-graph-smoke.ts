@@ -60,8 +60,8 @@ async function records(personId: string) {
 }
 const checkpoints = async (personId: string) => {
   const d = await db();
-  const t = "forget-" + hmac(personId).slice(0, 32);
-  return (await d.collection("lg_checkpoints").countDocuments({ thread_id: t })) + (await d.collection("lg_checkpoint_writes").countDocuments({ thread_id: t }));
+  const ts = ["forget-", "check-"].map((p) => p + hmac(personId).slice(0, 32));
+  return (await d.collection("lg_checkpoints").countDocuments({ thread_id: { $in: ts } })) + (await d.collection("lg_checkpoint_writes").countDocuments({ thread_id: { $in: ts } }));
 };
 const tombstones = async (personId: string) => (await db()).collection(TOMBSTONES).countDocuments({ hmac: hmac(personId) });
 
@@ -71,13 +71,13 @@ const check = (name: string, ok: boolean, detail: unknown) => {
   console.log(`${ok ? "PASS" : "FAIL"} ${name} ${JSON.stringify(detail)}`);
 };
 
-async function variant(killAt: "erase" | "erase-committed" | "verify") {
+async function variant(killAt: "erase" | "erase-committed" | "verify", mode: "after" | "strict") {
   const personId = `fgsmoke-${Date.now().toString(36)}-${killAt}`;
   await api("POST", "/api/checkin", { personId, venueId: "copper", scopes: ["use_taste", "contribute_crowd"] });
   for (const trackId of ["t13", "t15"]) await api("POST", "/api/tap", { personId, signal: 1, trackId });
   await new Promise((r) => setTimeout(r, 2500));
   const before = await records(personId);
-  const a = spawn(["--child", "run", personId], { FORGET_GRAPH_KILL_AT: killAt });
+  const a = spawn(["--child", "run", personId], { FORGET_GRAPH_KILL_AT: killAt, FORGET_GRAPH_MODE: mode });
   const afterKill = { exit: a.code, documentsWithId: await records(personId), checkpoints: await checkpoints(personId), tombstones: await tombstones(personId) };
   check(`killed at ${killAt}: process exited 137 with the request checkpointed`, a.code === 137 && afterKill.checkpoints > 0, { ...afterKill, before, stderr: a.err });
   const b = spawn(["--child", "resume"]);
@@ -105,9 +105,12 @@ else {
     process.exit(2);
   }
   await api("GET", "/api/health");
-  await variant("verify");
-  await variant("erase");
-  await variant("erase-committed");
+  await variant("verify", "after");
+  if (process.argv.includes("--strict")) {
+    await variant("verify", "strict");
+    await variant("erase", "strict");
+    await variant("erase-committed", "strict");
+  }
   console.log(failures ? `${failures} check(s) failed` : "forget graph smoke: all checks passed");
   await closeAll();
   process.exit(failures ? 1 : 0);

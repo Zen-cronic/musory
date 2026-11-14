@@ -25,6 +25,11 @@ import { client, db, redactError, DB_NAME, TAPS, DERIVED, CONSENTS, PRESENCE, SE
 import { forget } from "./room.js";
 
 export const forgetGraphOn = () => process.env.FORGET_GRAPH === "1";
+// "after" (default): forget's own transaction runs first, unchanged, and the follow-up checks run as the
+// checkpointed job after commit, so the room changes as fast as without the job.
+// "strict": the request itself is checkpointed before the delete (adds about a second before the room changes).
+const strict = () => process.env.FORGET_GRAPH_MODE === "strict";
+const CHECK_PREFIX = "check-";
 export const CHECKPOINTS = "lg_checkpoints";
 export const CHECKPOINT_WRITES = "lg_checkpoint_writes";
 const THREAD_PREFIX = "forget-";
@@ -127,6 +132,10 @@ async function verify(s: S): Promise<Partial<S>> {
 
 let saver: MongoDBSaver | null = null;
 let graph: ReturnType<typeof build> | null = null;
+let checkGraph: ReturnType<typeof buildCheck> | null = null;
+function buildCheck(checkpointer: MongoDBSaver) {
+  return new StateGraph(State).addNode("verify", verify).addEdge(START, "verify").addEdge("verify", END).compile({ checkpointer });
+}
 function build(checkpointer: MongoDBSaver) {
   return new StateGraph(State)
     .addNode("accept", accept)
@@ -139,13 +148,14 @@ function build(checkpointer: MongoDBSaver) {
     .compile({ checkpointer });
 }
 async function ready() {
-  if (graph && saver) return { graph, saver };
+  if (graph && saver && checkGraph) return { graph, saver, checkGraph };
   // The checkpointer bundles its own driver types; the app's MongoClient (7.9) speaks the same protocol.
   saver = new MongoDBSaver({ client: (await client("app")) as never, dbName: DB_NAME, checkpointCollectionName: CHECKPOINTS, checkpointWritesCollectionName: CHECKPOINT_WRITES });
   const errs = await saver.setup();
   if (errs.length) console.error("forget graph: checkpoint index setup:", errs.map((e) => e.message).join("; "));
   graph = build(saver);
-  return { graph, saver };
+  checkGraph = buildCheck(saver);
+  return { graph, saver, checkGraph };
 }
 
 async function checkpointDocs(threadId: string) {
@@ -188,6 +198,7 @@ const running = new Map<string, Promise<unknown>>();
 
 /** Forget me through the durable job. Same receipt as forget(), plus what the job did. */
 export async function runForgetGraph(personId: string) {
+  if (!strict()) return runAfterCommit(personId);
   const threadId = THREAD_PREFIX + hmac(personId).slice(0, 32);
   const inflight = running.get(threadId);
   if (inflight) return inflight;
@@ -216,13 +227,42 @@ export async function runForgetGraph(personId: string) {
   }
 }
 
+/** Forget first (the room's own transaction), then the checkpointed follow-up: verify, tombstone, cleanup. */
+async function runAfterCommit(personId: string) {
+  const threadId = CHECK_PREFIX + hmac(personId).slice(0, 32);
+  const inflight = running.get(threadId);
+  if (inflight) return inflight;
+  const job = (async () => {
+    const t0 = Date.now();
+    // One parallel read (no checkpoint) so verify knows which taps, taste and clips were this guest's.
+    const snap = await accept({ personId, steps: [] } as unknown as S);
+    const tf = Date.now();
+    const receipt = (await forget(personId)) as Record<string, any>;
+    const forgetMs = Date.now() - tf;
+    const { checkGraph } = await ready();
+    const cfg = { configurable: { thread_id: threadId }, durability: "sync" as const };
+    const final = (await checkGraph.invoke({ ...snap, personId, erased: { ran: true, receipt, forgetMs, forgetStartedAt: tf }, steps: ["accept", "erase"] } as never, cfg)) as S;
+    const r = await finish(threadId, final, false);
+    const ms = Date.now() - t0;
+    Object.assign(r.durable as Record<string, unknown>, { mode: "after commit", ms, overheadMs: ms - forgetMs, beforeRoomMs: tf - t0, afterRoomMs: ms - forgetMs - (tf - t0) });
+    return r;
+  })();
+  running.set(threadId, job);
+  try {
+    return await job;
+  } finally {
+    running.delete(threadId);
+  }
+}
+
 /** On boot: resume every unfinished forget job, and delete the checkpoints of finished ones. */
 export async function resumePending() {
-  const { graph } = await ready();
+  const { graph: strictGraph, checkGraph } = await ready();
   const d = await db();
-  const threads = (await d.collection(CHECKPOINTS).distinct("thread_id", { thread_id: { $regex: `^${THREAD_PREFIX}` } })) as string[];
+  const threads = (await d.collection(CHECKPOINTS).distinct("thread_id", { thread_id: { $regex: `^(${THREAD_PREFIX}|${CHECK_PREFIX})` } })) as string[];
   const out: unknown[] = [];
   for (const threadId of threads) {
+    const graph = (threadId.startsWith(CHECK_PREFIX) ? checkGraph : strictGraph) as typeof strictGraph;
     const cfg = { configurable: { thread_id: threadId }, durability: "sync" as const };
     try {
       const state = await graph.getState(cfg);
