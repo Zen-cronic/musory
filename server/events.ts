@@ -8,7 +8,7 @@ const RECENT_TYPES = new Set(["change_event", "vector_search", "txn", "refusal",
 let recent: { type: string; data: unknown; at: number }[] = [];
 
 export function subscribe(res: Response) {
-  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", "Content-Encoding": "identity", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   res.write(": connected\n\n");
   clients.add(res);
   res.on("close", () => clients.delete(res));
