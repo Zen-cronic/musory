@@ -17,7 +17,7 @@ import { generateFromRoom, hasMusicKey, liveMusicOn, musicState } from "./music.
 import { forgetGraphOn, runForgetGraph, resumePending } from "./forget-graph.js";
 import { findOn, findTrack } from "./find.js";
 import { latestEvals } from "./evals.js";
-import { vibeTap } from "./vibe.js";
+import { vibeTap, vibeOn } from "./vibe.js";
 import { byId } from "./catalog.js";
 import { removeClipAudio } from "./expiry.js";
 
@@ -123,6 +123,7 @@ app.get("/api/config", (req, res) =>
     stage: STAGE,
     music: hasMusicKey(),
     musicLive: liveMusicOn(),
+    vibe: vibeOn(),
     venues: VENUE_IDS.map((v) => ({ id: v, name: VENUES[v].name, view: VENUES[v].view })),
     clock: clockState(),
   }),

@@ -72,6 +72,13 @@ await sleep(2000); // the room re-picks right after the check-in
 r = await room("basement");
 check("taste applies at Basement 2 immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
 
+// "Tell the room what you want": a few words become one like on the closest track.
+if ((await api("/api/config")).vibe) {
+  await sleep(1100);
+  const v = await api("/api/vibe", { personId: guest, text: "something dark and driving" });
+  check("tell the room what you want: words become a like on the closest track", v.status === 200 && Boolean(v.vibe?.trackId), `${v.vibe?.title} (${v.vibe?.genre})`);
+}
+
 // 3. Bored of this: likes superseded, then undo.
 const pre = await api(`/api/me?personId=${guest}`);
 const playing = (await room("basement")).play?.genre;

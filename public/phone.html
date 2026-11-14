@@ -122,6 +122,14 @@
       <span class="note">Tap the sounds you like.</span>
       <div id="samples"></div>
     </div>
+    <div class="surface card vibe hidden" id="vibe">
+      <h2 class="display">Tell the room what you want</h2>
+      <form id="vibe-form" autocomplete="off">
+        <input id="vibe-q" type="text" maxlength="120" placeholder="something dark and driving" aria-label="Tell the room what you want">
+        <button id="vibe-send" class="btn small" type="submit">Send</button>
+      </form>
+      <div id="vibe-result" class="note"></div>
+    </div>
     <div class="surface card find" id="find">
       <h2 class="display">What was that track?</h2>
       <input id="find-q" type="text" placeholder="Describe it in your own words" autocomplete="off" aria-label="Describe the track in your own words">

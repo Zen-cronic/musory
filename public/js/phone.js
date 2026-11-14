@@ -166,6 +166,26 @@ async function samples() {
 }
 (async () => {
   cfg = await api("/api/config");
+  // "Tell the room what you want": a few words become one like on the closest track (Voyage + Vector Search).
+  if (cfg.vibe && !film) {
+    $("vibe").classList.remove("hidden");
+    $("vibe-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = $("vibe-q").value.trim();
+      if (text.length < 2) return;
+      $("vibe-send").disabled = true;
+      try {
+        const r = await api("/api/vibe", { personId: pid, text });
+        if (r.me) render(r.me);
+        $("vibe-result").textContent = r.message;
+        toast(r.message);
+        $("vibe-q").value = "";
+      } catch (err) {
+        $("vibe-result").textContent = err.status === 409 ? "Check in to a venue first." : err.message;
+      }
+      $("vibe-send").disabled = false;
+    });
+  }
   samples();
   render(await api(`/api/me?personId=${pid}`));
 })();
