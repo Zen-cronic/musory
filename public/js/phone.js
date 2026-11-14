@@ -1,4 +1,5 @@
-import { api, events, $, bars, toast, progress } from "/js/common.js";
+import { api, events, $, bars, toast, progress, genreName } from "/js/common.js";
+import { busy, settle, film } from "/js/look.js";
 
 const params = new URLSearchParams(location.search);
 const parts = location.pathname.split("/").filter(Boolean);
@@ -7,7 +8,7 @@ const pathVenue = parts[0] === "join" ? parts[1] : null;
 // The venue this page is for: the QR code's venue at first, then wherever the guest checks in.
 let wantVenue = pathVenue || params.get("venue");
 let switching = false; // while moving venues, a late reply about the old venue must not bring back the check-in sheet
-const asGuest = parts[0] === "p" ? parts[1] : params.get("as");
+const asGuest = parts[0] === "p" ? parts[1] : (params.get("guest") || params.get("as"));
 function personId() {
   if (asGuest) return asGuest;
   let id = null;
@@ -43,17 +44,19 @@ function render(m) {
   if (!here && !target) { $("venue-name").textContent = "Scan a venue's QR code"; }
   if (m.nowPlaying) showPlay(m.nowPlaying);
   bars($("taste"), m.taste?.weights);
-  $("taste-version").textContent = m.taste ? `v${m.taste.version} · ${m.taste.likes} likes` : "";
+  $("taste-version").textContent = m.taste ? `From ${m.taste.likes} ${m.taste.likes === 1 ? "like" : "likes"}` : "";
   const other = here === "copper" ? "basement" : "copper";
-  $("switch-venue").textContent = `Go to ${venueName(other)}`;
+  $("switch-venue").textContent = `Check in at ${venueName(other)} instead`;
+  $("switch-venue").dataset.testid = `checkin-venue-${other}`;
   $("carry").textContent = m.taste ? `Your taste goes with you. It counts at ${m.venue ?? "a venue"} only while you're checked in.` : "Tap \"I like this\" to start your taste.";
   $("tonight-state").textContent = m.tonight ? `Tonight only at ${venueName(m.tonight.venueId)} until ${new Date(m.tonight.expiresAt).toLocaleTimeString()}. These taps never enter your long-term taste unless you keep one.` : "Your taps go into your long-term taste.";
-  $("tonight").textContent = m.tonight ? "End tonight-only" : "Try something different tonight (here only)";
-  $("night").innerHTML = (m.night || []).map((p) => `<div data-track-id="${p.trackId}">${new Date(p.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ${p.title} <span class="mute">${p.genre}</span></div>`).join("") || "Nothing yet.";
+  $("tonight").innerHTML = m.tonight ? `End tonight only<span class="sub">Back to your usual taste</span>` : `Tonight only<span class="sub">Try something new</span>`;
+  $("night").innerHTML = (m.night || []).map((p) => `<div class="tap" data-track-id="${p.trackId}"><span><b>${p.title}</b><br><span class="meta">${genreName(p.genre)}</span></span><span class="state">${new Date(p.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>`).join("") || `<div class="note">Nothing yet.</div>`;
   $("taps").innerHTML = (m.taps || []).slice(0, 12).map((t) => `
-    <div class="tap" data-tap-id="${t.tapId}"><span>${t.signal > 0 ? "♥" : "✕"} ${t.title} <span class="mute">${t.genre} · ${venueName(t.venueId)}</span></span>
-    <span class="mono mute">${t.status === "superseded" ? "superseded" : t.scope === "tonight" ? (t.promoted ? "kept" : `<button data-keep="${t.tapId}">Keep this one</button>`) : ""}</span></div>`).join("") || `<div class="mute">No taps yet.</div>`;
+    <div class="tap" data-tap-id="${t.tapId}"><span>${t.signal > 0 ? "Liked" : "Skipped"} <b>${t.title}</b><br><span class="meta">${genreName(t.genre)}, ${venueName(t.venueId)}</span></span>
+    <span class="state">${t.status === "superseded" ? "Set aside" : t.scope === "tonight" ? (t.promoted ? "Kept" : `<button data-keep="${t.tapId}">Keep this one</button>`) : ""}</span></div>`).join("") || `<div class="note">No taps yet.</div>`;
   document.querySelectorAll("[data-keep]").forEach((b) => (b.onclick = async () => { render(await api("/api/tonight/keep", { personId: pid, tapId: b.dataset.keep })); toast("Kept in your long-term taste."); }));
+  settle();
 }
 let wyTimer;
 function withoutYou() {
@@ -62,15 +65,15 @@ function withoutYou() {
     if (!state?.venueId && !state?.taps?.length) { $("without-you").innerHTML = ""; return; }
     const w = await api(`/api/without?personId=${pid}`).catch(() => null);
     if (!w) return;
-    $("without-you").innerHTML = `<div class="label">If you leave every crowd's memory</div>` + w.venues.map((v) =>
-      `<div data-venue="${v.venueId}"><b>${v.venue}</b> plays next: <span class="mono" data-role="with-you" data-track-id="${v.withYou?.trackId ?? ""}">${v.withYou?.title ?? "–"}</span> with you, <span class="mono" data-role="without-you" data-track-id="${v.withoutYou?.trackId ?? ""}">${v.withoutYou?.title ?? "–"}</span> without you</div>`).join("");
+    $("without-you").innerHTML = `<div class="label">If you say forget me</div>` + w.venues.map((v) =>
+      `<div data-venue="${v.venueId}"><b>${v.venue}</b> plays <span data-role="with-you" data-track-id="${v.withYou?.trackId ?? ""}">${v.withYou?.title ?? "the same track"}</span> with you, <b data-role="without-you" data-track-id="${v.withoutYou?.trackId ?? ""}">${v.withoutYou?.title ?? "the same track"}</b> without you.</div>`).join("");
   }, 300);
 }
 function showPlay(p) {
   const t = $("now-title");
   t.textContent = p.title;
   t.dataset.trackId = p.trackId;
-  $("now-meta").textContent = `${p.genre} · ${p.bpm} BPM`;
+  $("now-meta").textContent = `${genreName(p.genre)}, ${p.bpm} BPM`;
   progress($("now-progress"), p);
   withoutYou();
 }
@@ -117,15 +120,33 @@ async function doForget() {
   $("volunteer").classList.add("hidden");
   $("consent").classList.add("hidden");
   const el = $("receipt");
-  const rooms = r.venues.filter((v) => v.contributionRemoved).length;
-  el.innerHTML = `<div class="label">Forgotten</div>
-    <h2 class="big" style="font-size:26px">Removed your share from ${rooms === 1 ? "1 room's" : `${rooms} rooms'`} crowd memory.</h2>
-    <div class="count" id="receipt-count">${r.totalBefore} → ${r.totalAfter}</div>
-    <div>records about you, in one database transaction.</div>
-    ${r.venues.map((v) => `<div style="margin-top:8px" data-venue="${v.venueId}"><b>${v.venue}</b>: ${v.contributionRemoved ? `crowd memory ${v.crowdContributorsBefore} → ${v.crowdContributorsAfter} people${v.crowdMemoryKept ? "" : " (not enough people, so it was removed)"}` : "none of your taps were in its crowd memory"}. Now playing <b>${v.pickAfter?.title ?? "–"}</b>${v.matchesWithoutYou ? ", the track it said it would play without you" : ""}.</div>`).join("")}
-    <div class="mute" style="margin-top:8px">Your taste, taps and check-ins are gone. The venues keep their own staff notes.</div>`;
+  const RING = `<svg class="mark ring wide draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M200 34 C 214 74, 160 106, 104 106 C 44 106, 4 86, 5 54 C 6 22, 56 3, 114 3 C 170 3, 214 16, 210 44"/></svg>`;
+  el.innerHTML = `<span class="wordmark">Musory</span>
+    <h1 class="display">You're forgotten</h1>
+    <div class="figure marked" id="receipt-count" data-testid="receipt-count">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div>
+    <p>records about you, deleted in one step</p>
+    <div class="surface receipt-box">${r.venues.map((v) => `<div class="row" data-venue="${v.venueId}"><b>${v.venue}</b><span>${v.contributionRemoved ? (v.crowdMemoryKept === false ? "Your share of its crowd memory: removed. Too few people were left, so it was deleted." : "Your share of its crowd memory: removed.") : "None of your likes were in its crowd memory."}</span>${v.pickAfter ? `<span class="${v.matchesWithoutYou ? "ok" : ""}">Next: ${v.pickAfter.title}${v.matchesWithoutYou ? ", the track it would play without you." : "."}</span>` : ""}</div>`).join("")}</div>
+    <p style="font-size:14px;font-weight:600">Your taste, likes and check-ins are gone. Each venue keeps only its own notes.</p>`;
   el.classList.remove("hidden");
+  busy(true);
+  setTimeout(() => { busy(false); settle(); }, 800);
 }
+// What was that track? Live pitch only (hidden when filming). Shows name, genre and time played.
+let findTimer;
+$("find-q").addEventListener("input", () => {
+  clearTimeout(findTimer);
+  findTimer = setTimeout(async () => {
+    const q = $("find-q").value.trim();
+    const v = state?.venueId || wantVenue;
+    if (q.length < 3 || !v) { $("find-result").innerHTML = ""; return; }
+    const r = await api(`/api/find?venue=${v}&q=${encodeURIComponent(q)}`).catch(() => null);
+    const t = (r?.tracks || r?.results || (Array.isArray(r) ? r : []))[0];
+    $("find-result").innerHTML = t
+      ? `<div class="result"><b>${t.title}</b><span>${genreName(t.genre)}${t.playedAt || t.at ? `, played at ${new Date(t.playedAt || t.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</span></div>`
+      : `<span class="note">${r ? "Nothing played here tonight matches that yet." : "Not available right now."}</span>`;
+  }, 350);
+});
+if (film) $("find").remove();
 $("forget-yes").onclick = act(doForget);
 $("forget-big").onclick = act(doForget);
 
@@ -136,7 +157,7 @@ events({
 });
 async function samples() {
   const list = await api("/api/samples");
-  $("samples").innerHTML = list.map((t) => `<button data-sample="${t.trackId}">${t.genre}</button>`).join("");
+  $("samples").innerHTML = list.map((t) => `<button data-sample="${t.trackId}">${genreName(t.genre)}</button>`).join("");
   document.querySelectorAll("[data-sample]").forEach((b) => (b.onclick = act(async () => {
     const r = await api("/api/tap", { personId: pid, signal: 1, trackId: b.dataset.sample });
     if (r.me) render(r.me);

@@ -3,93 +3,151 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Musory</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/base.css">
+<script src="/js/look-early.js"></script>
+<link rel="stylesheet" href="/css/musory.css">
 <style>
-  body { padding: 16px; max-width: 480px; margin: 0 auto; }
-  button { width: 100%; margin: 6px 0; font-size: 18px; padding: 16px; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  #like { font-size: 26px; padding: 22px; }
-  #now-title { font-size: 34px; margin: 4px 0; }
-  #venue-name { font-size: 28px; margin: 0; }
-  section { margin: 14px 0; }
-  #forget-big { font-size: 34px; padding: 34px; }
-  #receipt .count { font-size: 64px; font-weight: 900; color: var(--band); font-family: var(--mono); }
-  .tap { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
-  .tap button { width: auto; margin: 0; padding: 4px 8px; font-size: 12px; }
-  label { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; }
-  input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--band); }
+  body { min-height: 100vh; }
+  .phone { max-width: 480px; margin: 0 auto; padding: 16px 16px calc(28px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; }
+  .bar-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .bar-top .who { text-align: right; font-weight: 700; font-size: var(--s-2); line-height: 1.2; }
+  .bar-top .who span { display: block; color: var(--on-bg-muted); font-weight: 600; }
+  #venue-name { font-size: calc(52px * var(--dscale)); }
+  section { display: flex; flex-direction: column; gap: 12px; }
+  .lead { font-size: 17px; font-weight: 500; }
+  .consent { padding: 4px 16px; gap: 0; }
+  .opt { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: center; padding: 14px 0; border-bottom: 2px solid currentColor; cursor: pointer; }
+  .opt:last-child { border-bottom: 0; }
+  .opt b { font-size: 18px; }
+  .opt small { grid-column: 1; font-size: var(--s-2); color: var(--muted); }
+  .opt input { grid-row: span 2; grid-column: 2; appearance: none; -webkit-appearance: none; width: 58px; height: 34px; border-radius: 999px; border: var(--rule) solid currentColor; background: var(--surface); position: relative; cursor: pointer; margin: 0; }
+  .opt input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: currentColor; transition: transform var(--t-base) var(--ease); }
+  .opt input:checked { background: var(--text); }
+  .opt input:checked::after { background: var(--band); transform: translateX(24px); }
+  .now { padding: 16px; gap: 6px; }
+  .now .t { font-size: calc(44px * var(--dscale)); }
+  .now .g { color: var(--slab-muted); font-weight: 600; font-size: 15px; }
+  .btn.like { min-height: 72px; font-size: 24px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .two .btn { flex-direction: column; gap: 2px; min-height: 72px; font-size: 18px; line-height: 1.1; padding: 8px 10px; }
+  .card { padding: 14px 16px; gap: 10px; }
+  .card h2 { font-size: calc(24px * var(--dscale)); }
+  .card .note { font-size: var(--s-2); color: var(--muted); }
+  #samples { display: flex; flex-wrap: wrap; gap: 8px; }
+  #samples button { min-height: 40px; padding: 0 14px; font-size: 15px; border-radius: var(--btn-radius); border: 2px solid currentColor; background: transparent; font-weight: 700; color: var(--text); }
+  .tap { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--track); font-size: 15px; align-items: center; }
+  .tap .meta { color: var(--muted); font-size: 13px; }
+  .tap .state { font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .tap button { min-height: 32px; padding: 0 10px; font-size: 13px; border: 2px solid currentColor; background: transparent; font-weight: 700; border-radius: var(--btn-radius); color: var(--text); }
+  #without-you:empty { display: none; }
+  #without-you { font-size: 15px; }
+  #without-you .label { font-family: var(--f-mono); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .confirm { padding: 18px 16px; gap: 14px; box-shadow: inset 0 0 0 var(--rule) currentColor; }
+  .confirm h2 { font-size: calc(36px * var(--dscale)); }
+  .confirm ul { list-style: none; display: grid; gap: 8px; font-size: 16px; font-weight: 600; }
+  .confirm li { padding-left: 18px; position: relative; }
+  .confirm li::before { content: ""; position: absolute; left: 0; top: 7px; width: 8px; height: 8px; background: var(--band); }
+  .confirm p { font-size: var(--s-2); color: var(--muted); }
+  .forget-note { text-align: center; font-size: var(--s-2); color: var(--on-bg-muted); margin-top: -6px; }
+  .receipt-screen { position: fixed; inset: 0; z-index: 20; overflow: auto; padding: 22px 18px 28px; display: flex; flex-direction: column; gap: 16px; }
+  .receipt-screen .wordmark { align-self: flex-start; background: var(--on-band); color: var(--band); }
+  .receipt-screen h1 { font-size: min(calc(64px * var(--dscale)), 12vw); }
+  .receipt-screen .figure { font-size: 112px; align-self: flex-start; }
+  .receipt-screen .figure + p { font-weight: 700; font-size: 18px; margin-top: -6px; }
+  .receipt-box { padding: 4px 16px; gap: 0; }
+  .receipt-box .row { padding: 12px 0; border-bottom: 2px dashed currentColor; display: grid; gap: 2px; }
+  .receipt-box .row:last-child { border-bottom: 0; }
+  .receipt-box .row b { font-size: 18px; }
+  .receipt-box .row span { font-size: var(--s-2); }
+  .receipt-box .ok { color: var(--ok); font-weight: 800; }
+  .find input { font: inherit; font-size: 17px; padding: 12px 14px; border: 2px solid currentColor; border-radius: var(--btn-radius); background: var(--surface); color: var(--text); width: 100%; }
+  .find .result { display: grid; gap: 2px; padding: 10px 12px; box-shadow: inset 0 0 0 2px currentColor; }
+  .find .result b { font-size: 20px; }
+  [data-film] .find { display: none !important; }
 </style>
 </head>
 <body>
-<header class="row" style="display:flex;justify-content:space-between;align-items:center">
-  <div><div class="label">Musory</div><h1 id="venue-name" class="big">…</h1></div>
-  <div id="guest-label" class="mono mute"></div>
-</header>
+<main class="phone">
+  <header class="bar-top">
+    <a class="wordmark" href="/">Musory</a>
+    <div class="who"><span id="guest-label"></span></div>
+  </header>
+  <h1 id="venue-name" class="display">…</h1>
 
-<section id="consent" class="card hidden">
-  <div class="label">Check in</div>
-  <h2 id="consent-venue" class="big" style="font-size:28px">…</h2>
-  <label><input type="checkbox" id="scope-taste" checked><span><b>Use my taste here while I'm checked in.</b><br><span class="mute">Your likes travel with you. This venue uses them only while you're here, and keeps no copy.</span></span></label>
-  <label><input type="checkbox" id="scope-crowd" checked><span><b>Add my taps to this venue's crowd memory.</b><br><span class="mute">Kept only as part of a group of 3 or more people, with no name or id.</span></span></label>
-  <button id="checkin" class="primary">Check in</button>
-</section>
-
-<section id="main" class="hidden">
-  <div class="card">
-    <div class="label">Now playing</div>
-    <h2 id="now-title" class="big" data-track-id="">…</h2>
-    <div id="now-meta" class="mono mute"></div>
-    <div class="progress" style="margin-top:10px"><div id="now-progress"></div></div>
-  </div>
-  <button id="like" class="primary">I like this</button>
-  <div class="two">
-    <button id="skip">Not for me</button>
-    <button id="bored">Bored of this</button>
-  </div>
-  <button id="undo" class="hidden">Undo "bored"</button>
-  <div class="card" style="margin-top:8px">
-    <div class="label">Start your taste: tap the sounds you like</div>
-    <div id="samples" class="two"></div>
-  </div>
-  <div class="card" style="margin-top:8px">
-    <div class="label">Tonight only</div>
-    <div id="tonight-state" class="mute">Your taps go into your long-term taste.</div>
-    <button id="tonight">Try something different tonight (here only)</button>
-  </div>
-  <section class="card">
-    <div class="label">Your taste <span id="taste-version" class="mono"></span></div>
-    <div id="taste" class="bars"></div>
-    <div id="carry" class="mute" style="margin-top:6px"></div>
-    <button id="switch-venue">Go to the other venue</button>
+  <section id="consent" class="hidden">
+    <p class="lead">The music here follows the people who check in. Nothing about you counts until you say yes.</p>
+    <h2 id="consent-venue" hidden>…</h2>
+    <div class="surface consent">
+      <label class="opt"><b>Use my taste here</b><input type="checkbox" id="scope-taste" data-testid="consent-taste" checked><small>Only while you're checked in. This venue keeps no copy.</small></label>
+      <label class="opt"><b>Add me to this venue's crowd memory</b><input type="checkbox" id="scope-crowd" data-testid="consent-crowd" checked><small>Counted only with at least 2 other people. Your name is never kept.</small></label>
+    </div>
+    <button id="checkin" class="btn primary like" data-testid="checkin-yes">Check in</button>
   </section>
-  <section class="card">
-    <div class="label">Your night: what played while you were here</div>
-    <div id="night" class="mute"></div>
+
+  <section id="main" class="hidden">
+    <div class="slab now">
+      <span class="kicker">Now playing</span>
+      <h2 id="now-title" class="display t" data-track-id="">…</h2>
+      <span id="now-meta" class="g"></span>
+      <div class="progress"><div id="now-progress"></div></div>
+    </div>
+    <button id="like" class="btn primary like" data-testid="like">I like this</button>
+    <div class="two">
+      <button id="bored" class="btn" data-testid="bored">Bored of this<span class="sub">Set my old likes aside</span></button>
+      <button id="tonight" class="btn" data-testid="tonight">Tonight only<span class="sub">Try something new</span></button>
+    </div>
+    <div class="two">
+      <button id="skip" class="btn small">Not for me</button>
+      <button id="undo" class="btn small hidden">Undo "bored"</button>
+    </div>
+    <div class="surface card">
+      <h2 class="display">Your taste</h2>
+      <span id="tonight-state" class="note"></span>
+      <div id="taste" class="bars"></div>
+      <span id="carry" class="note"></span>
+      <span id="taste-version" class="note"></span>
+    </div>
+    <div class="surface card">
+      <h2 class="display">Start your taste</h2>
+      <span class="note">Tap the sounds you like.</span>
+      <div id="samples"></div>
+    </div>
+    <button id="switch-venue" class="btn" data-testid="checkin-venue-basement">Go to the other venue</button>
+    <div class="surface card find" id="find">
+      <h2 class="display">What was that track?</h2>
+      <input id="find-q" type="text" placeholder="Describe it in your own words" autocomplete="off" aria-label="Describe the track in your own words">
+      <div id="find-result"></div>
+    </div>
+    <div class="surface card">
+      <h2 class="display">Your night</h2>
+      <span class="note">What played while you were here.</span>
+      <div id="night"></div>
+    </div>
+    <div class="surface card">
+      <h2 class="display">Your taps</h2>
+      <div id="taps"></div>
+    </div>
+    <button id="checkout" class="btn small">Check out</button>
   </section>
-  <section class="card">
-    <div class="label">Your taps</div>
-    <div id="taps"></div>
+
+  <section id="forget-section" class="hidden">
+    <div id="without-you" class="surface card"></div>
+    <button id="forget" class="btn forget like" data-testid="forget-me">Forget me</button>
+    <p class="forget-note">Removes you from every venue's memory.</p>
+    <div id="forget-confirm" class="surface card confirm hidden">
+      <h2 class="display">Forget me everywhere?</h2>
+      <ul><li>Your likes and your taste are deleted.</li><li>Your share of each venue's crowd memory is removed.</li><li>Both rooms pick their next track without you.</li></ul>
+      <p>This can't be undone. Each venue keeps its own notes, which never had your name.</p>
+      <button id="forget-yes" class="btn forget" data-testid="forget-confirm">Yes, forget me</button>
+      <button id="forget-no" class="btn">Cancel</button>
+    </div>
   </section>
-  <button id="checkout">Check out</button>
-</section>
 
-<section id="forget-section" class="hidden">
-  <div id="without-you" class="card" style="margin-bottom:8px"></div>
-  <button id="forget" class="band">Forget me</button>
-  <div id="forget-confirm" class="card hidden">
-    <b>Delete your taste, your taps and your share of every venue's crowd memory?</b>
-    <button id="forget-yes" class="band">Yes, forget me</button>
-    <button id="forget-no">Cancel</button>
-  </div>
-</section>
-
-<section id="volunteer" class="hidden">
-  <div class="label">You were picked</div>
-  <button id="forget-big" class="band big">Forget me</button>
-</section>
-
-<section id="receipt" class="card hidden"></section>
+  <section id="volunteer" class="hidden">
+    <span class="kicker">You were picked</span>
+    <button id="forget-big" class="btn forget like" style="min-height:120px;font-size:34px">Forget me</button>
+  </section>
+</main>
+<section id="receipt" class="flood receipt-screen hidden" data-testid="receipt"></section>
 <script type="module" src="/js/phone.js"></script>
 </body>
 </html>

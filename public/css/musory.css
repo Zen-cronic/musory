@@ -6,6 +6,21 @@
 @font-face { font-family: "JetBrains Mono"; src: url(../fonts/jbmono-latin.woff2) format("woff2"); font-weight: 400 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 @font-face { font-family: "JetBrains Mono"; src: url(../fonts/jbmono-latin-ext.woff2) format("woff2"); font-weight: 400 800; font-display: swap; unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 
+/* Look: Evergreen. The database brand night: slate-blue ground, evergreen fields, its own lime-to-green gradient as livery. */
+[data-look="evergreen"] {
+  --bg: #061621; --bg-2: #001E2B; --on-bg: #FFFFFF; --on-bg-muted: #B8C4C2;
+  --surface: #112733; --text: #FFFFFF; --muted: #B8C4C2; --track: #1C2D38;
+  --slab: #023430; --on-slab: #FFFFFF; --slab-muted: #C0FAE6; --slab-line: #0B4A40;
+  --band: #B1FF05; --on-band: #001E2B; --ok: #00ED64; --db: #00ED64;
+  --field: linear-gradient(98deg, rgba(0,0,0,0) 0 71%, rgba(177,255,5,.85) 71% 72.2%, rgba(0,0,0,0) 72.2% 73.4%, rgba(0,237,100,.6) 73.4% 74.2%, rgba(0,0,0,0) 74.2%), radial-gradient(110% 80% at 88% -12%, rgba(0,104,74,.62) 0%, rgba(2,52,48,.38) 38%, rgba(6,22,33,0) 72%), radial-gradient(80% 70% at -6% 112%, rgba(0,104,74,.42) 0%, rgba(6,22,33,0) 62%), linear-gradient(180deg, #001E2B 0%, #061621 60%);
+  --slab-bg: radial-gradient(circle at 50% -190%, rgba(0,237,100,0) 68%, rgba(0,237,100,.3) 80%, rgba(177,255,5,0) 84%), radial-gradient(120% 95% at 100% 0%, rgba(0,104,74,.7), rgba(0,104,74,0) 58%), linear-gradient(160deg, #034438 0%, #023430 42%, #01261F 100%);
+  --pick-bg: radial-gradient(130% 120% at 100% 0%, rgba(0,237,100,.24), rgba(0,237,100,0) 55%), linear-gradient(160deg, #034438 0%, #023430 60%);
+  --surface-bg: linear-gradient(165deg, #173543 0%, #112733 52%, #0D212B 100%);
+  --flood-bg: radial-gradient(90% 60% at 100% 0%, rgba(255,255,255,.28), rgba(255,255,255,0) 60%), linear-gradient(160deg, #B1FF05 0%, #7DF73A 48%, #00ED64 100%);
+  --band-bg: linear-gradient(91deg, #B1FF05, #00ED64 94.83%);
+  --mark: #B1FF05; --mark-slab: #B1FF05; --marks: block; --chamfer: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  --stretch: 75%; --case: uppercase; --track-display: -.01em; --radius: 0px; --rule: 2px; --btn-radius: 0px; --dscale: .98;
+}
 /* Fallback tokens before a look is set */
 :root {
   --bg: #D6D6D2; --bg-2: #C4C4BF; --on-bg: #121212; --on-bg-muted: #4A4A46;
@@ -21,45 +36,6 @@
 /* v3 looks: club themes (marker annotations, chamfered tickets,
    a colour fade from the top edge, set-time captions), with MongoDB's own greens. */
 
-/* Look: Livery. Off-white with the signature lime fading down from the top edge, ink tickets, ink marker marks. */
-[data-look="livery"] {
-  --bg: #F4F4ED; --bg-2: #E6E8DA; --on-bg: #111112; --on-bg-muted: #4A4B45;
-  --surface: #FFFFFF; --text: #111112; --muted: #4A4B45; --track: #E6E8DA;
-  --slab: #111112; --on-slab: #F4F4ED; --slab-muted: #B4B8A5; --slab-line: #2E302A;
-  --band: #D2FF00; --on-band: #111112; --ok: #3E6B00; --db: #111112;
-  --field: linear-gradient(180deg, #D2FF00 0%, rgba(210,255,0,.55) 9%, rgba(244,244,237,0) 34%);
-  --slab-bg: linear-gradient(115deg, rgba(0,0,0,0) 0 84%, rgba(210,255,0,.9) 84% 86%, rgba(0,0,0,0) 86% 87.4%, rgba(210,255,0,.45) 87.4% 88.6%, rgba(0,0,0,0) 88.6%), #111112;
-  --flood-bg: linear-gradient(180deg, #D2FF00 0%, #D2FF00 55%, #C4F000 100%);
-  --band-bg: #D2FF00;
-  --mark: #111112; --mark-slab: #D2FF00; --marks: block; --chamfer: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-  --stretch: 75%; --case: uppercase; --track-display: -.01em; --radius: 0px; --rule: 3px; --btn-radius: 0px; --dscale: .98;
-}
-/* Look: Evergreen. The database's slate-blue night, its lime-to-green gradient as livery, lime marker marks. */
-[data-look="evergreen"] {
-  --bg: #061621; --bg-2: #001E2B; --on-bg: #FFFFFF; --on-bg-muted: #B8C4C2;
-  --surface: #112733; --text: #FFFFFF; --muted: #B8C4C2; --track: #1C2D38;
-  --slab: #023430; --on-slab: #FFFFFF; --slab-muted: #C0FAE6; --slab-line: #0B4A40;
-  --band: #B1FF05; --on-band: #001E2B; --ok: #00ED64; --db: #00ED64;
-  --field: linear-gradient(98deg, rgba(0,0,0,0) 0 71%, rgba(177,255,5,.85) 71% 72.2%, rgba(0,0,0,0) 72.2% 73.4%, rgba(0,237,100,.6) 73.4% 74.2%, rgba(0,0,0,0) 74.2%), linear-gradient(180deg, #001E2B 0%, #061621 60%);
-  --slab-bg: linear-gradient(160deg, #023430 0%, #01261F 70%);
-  --flood-bg: linear-gradient(91deg, #B1FF05, #00ED64 94.83%);
-  --band-bg: linear-gradient(91deg, #B1FF05, #00ED64 94.83%);
-  --mark: #B1FF05; --mark-slab: #B1FF05; --marks: block; --chamfer: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-  --stretch: 75%; --case: uppercase; --track-display: -.01em; --radius: 0px; --rule: 2px; --btn-radius: 0px; --dscale: .98;
-}
-/* Look: Pit wall. The database's pale greys and mint, evergreen tickets, lime plates, forest-green marker marks. */
-[data-look="pitwall"] {
-  --bg: #F9FBFA; --bg-2: #E8EDEB; --on-bg: #001E2B; --on-bg-muted: #3D4F58;
-  --surface: #FFFFFF; --text: #001E2B; --muted: #3D4F58; --track: #E8EDEB;
-  --slab: #023430; --on-slab: #FFFFFF; --slab-muted: #C0FAE6; --slab-line: #0B4A40;
-  --band: #D2FF00; --on-band: #001E2B; --ok: #00684A; --db: #00684A;
-  --field: radial-gradient(120% 70% at 50% 120%, #E3FCF7 0%, rgba(227,252,247,0) 70%), linear-gradient(180deg, #D2FF00 0%, rgba(210,255,0,.35) 6%, rgba(249,251,250,0) 22%);
-  --slab-bg: linear-gradient(115deg, rgba(0,0,0,0) 0 84%, rgba(210,255,0,.85) 84% 86%, rgba(0,0,0,0) 86% 87.4%, rgba(0,237,100,.55) 87.4% 88.6%, rgba(0,0,0,0) 88.6%), linear-gradient(160deg, #00684A 0%, #023430 55%);
-  --flood-bg: linear-gradient(180deg, #D2FF00 0%, #D2FF00 55%, #C4F000 100%);
-  --band-bg: #D2FF00;
-  --mark: #00684A; --mark-slab: #D2FF00; --marks: block; --chamfer: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-  --stretch: 75%; --case: uppercase; --track-display: -.01em; --radius: 0px; --rule: 3px; --btn-radius: 0px; --dscale: .98;
-}
 
 :root {
   --f-display: "Archivo", "Arial Narrow", Arial, sans-serif;
@@ -94,7 +70,7 @@ a { color: inherit; }
 .wordmark.lg::after { width: 22px; height: 22px; border-width: 5px; }
 
 /* Surfaces */
-.surface, .ticket { background: var(--surface); color: var(--text); border-radius: var(--radius); }
+.surface, .ticket { background: var(--surface-bg, var(--surface)); color: var(--text); border-radius: var(--radius); }
 .slab { background: var(--slab-bg, var(--slab)); color: var(--on-slab); border-radius: var(--radius); }
 .flood { background: var(--flood-bg, var(--band)); color: var(--on-band); }
 .rail { background: var(--bg-2); border-radius: var(--radius); }

@@ -224,7 +224,7 @@ window.addEventListener("lookchange", setQr);
 
 if (!film && !embed) {
   $("menu-slot").replaceWith(lookMenu());
-  $("help-slot").replaceWith(helpPanel([["N", "Play the next track now"], ["H", "Next hour"], ["M", "Sound on or off"], ["L", "Next look"], ["?", "Show or hide this panel"]]));
+  $("help-slot").replaceWith(helpPanel([["N", "Play the next track now"], ["H", "Next hour"], ["M", "Sound on or off"], ["?", "Show or hide this panel"]]));
 }
 if (film || embed) $("start-overlay").classList.add("hidden");
 $("start-room").onclick = () => {

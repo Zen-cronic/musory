@@ -8,11 +8,9 @@
 
 export const PRODUCT = "Musory";
 
-export const LOOKS = ["evergreen", "pitwall", "livery"];
+export const LOOKS = ["evergreen"];
 export const LOOK_LABEL = {
   evergreen: "Evergreen",
-  pitwall: "Pit wall",
-  livery: "Livery",
 };
 // The default look. Change this one line (and look-early.js) to switch it.
 export const DEFAULT_LOOK = "evergreen";
@@ -77,6 +75,7 @@ root.dataset.busy = "0";
 
 /** The Look menu: a plain select in the top bar. */
 export function lookMenu() {
+  if (LOOKS.length < 2) return document.createElement("span");
   const wrap = document.createElement("label");
   wrap.className = "look-menu";
   wrap.innerHTML = `<span>Look</span><select aria-label="Look">${LOOKS.map((l) => `<option value="${l}">${LOOK_LABEL[l]}</option>`).join("")}</select>`;
@@ -90,12 +89,10 @@ export function lookMenu() {
 /** The Keys and links panel. keys: [[key, what it does]]. */
 export function helpPanel(keys = []) {
   const links = [
-    ["?style=" + LOOKS.join("|"), "Look. The menu in the top bar sets it too"],
     ["?film=1", "Filming: no controls or menus"],
     ["?embed=1", "Light panel, used by /compare"],
     ["?venue=copper|basement", "Which venue the page shows"],
     ["?guest=jess", "The phone acts as this guest"],
-    ["/compare", "The same live room in every look"],
     ["/stage?venue=copper", "Projector screen: QR, count, receipt"],
     ["/how", "How it works, live"],
   ];
@@ -120,7 +117,6 @@ export function helpPanel(keys = []) {
     if (e.target.closest?.("input, select, textarea")) return;
     if (e.key === "?") toggle();
     if (e.key === "Escape") toggle(false);
-    if (e.key === "l" || e.key === "L") setLook(LOOKS[(LOOKS.indexOf(look) + 1) % LOOKS.length]);
   });
   return btn;
 }

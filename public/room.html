@@ -23,8 +23,8 @@
   .now .meta { display: flex; gap: 8px; flex-wrap: wrap; }
   .now .desc { color: var(--slab-muted); font-size: 17px; font-weight: 500; max-width: 52ch; }
   .next { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .pick { display: grid; gap: 6px; padding: 12px 14px; border: var(--rule) solid currentColor; border-radius: var(--radius); align-content: start; }
-  .pick.plays { background: var(--slab-bg, var(--slab)); color: var(--on-slab); border-color: transparent; }
+  .pick { position: relative; display: grid; gap: 6px; padding: 12px 14px; border: var(--rule) solid currentColor; border-radius: var(--radius); align-content: start; }
+  .pick.plays { background: var(--pick-bg, var(--slab-bg, var(--slab))); color: var(--on-slab); border-color: transparent; }
   .pick.plays .kicker { color: var(--slab-muted); }
   .pick .t { font-size: calc(34px * var(--dscale)); }
   .pick .g { font-size: var(--s-2); font-weight: 600; }
