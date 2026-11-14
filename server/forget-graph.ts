@@ -4,8 +4,9 @@
 //
 // accept  records which taps are the guest's, before anything is deleted (checkpointed in Atlas);
 // erase   calls the room's forget (one transaction across every venue); safe to run again;
-// verify  recounts every guest record, checks no derived record still points at those taps,
-//         and writes the result onto the forget-me tombstone.
+// verify  recounts every guest record, checks no derived record still points at those taps or the
+//         guest's taste, checks every clip composed from the guest is gone, and writes the result
+//         onto the forget-me tombstone.
 //
 // Once "accept" is checkpointed, a restart can't lose the request: on boot, unfinished jobs resume at
 // the step they stopped at. When a job ends (or is found finished on boot) its checkpoints are deleted,
@@ -34,9 +35,11 @@ const hmac = (personId: string) => createHmac("sha256", process.env.TOMBSTONE_HM
 const State = Annotation.Root({
   personId: Annotation<string>(),
   tapIds: Annotation<string[]>(),
+  tasteId: Annotation<string>(),
+  clipIds: Annotation<string[]>(),
   before: Annotation<number>(),
   erased: Annotation<{ ran: boolean; skipped?: string; receipt?: Record<string, any> } | null>(),
-  verified: Annotation<{ ok: boolean; recordsLeft: number; derivedPointingAtTaps: number; tombstone: boolean; picksMatched: boolean | null } | null>(),
+  verified: Annotation<{ ok: boolean; recordsLeft: number; derivedPointingAtTaps: number; clipsComposedFromYou: number; clipsLeft: number; tombstone: boolean; picksMatched: boolean | null } | null>(),
   steps: Annotation<string[]>({ reducer: (a, b) => a.concat(b), default: () => [] }),
 });
 type S = typeof State.State;
@@ -64,8 +67,26 @@ const killAt = (step: string) => {
 
 async function accept(s: S): Promise<Partial<S>> {
   const d = await db();
-  const [taps, before] = await Promise.all([d.collection(TAPS).find({ personId: s.personId }, { projection: { _id: 1 } }).toArray(), recordsFor(s.personId)]);
-  return { tapIds: taps.map((t) => String(t._id)), before, erased: null, verified: null, steps: ["accept"] };
+  const [taps, before, taste] = await Promise.all([
+    d.collection(TAPS).find({ personId: s.personId }, { projection: { _id: 1 } }).toArray(),
+    recordsFor(s.personId),
+    d.collection(DERIVED).findOne({ kind: "taste", ownerId: s.personId }, { projection: { _id: 1 } }),
+  ]);
+  // The clips composed from this guest, found the way forget finds them: walking derivedFrom from the taps.
+  const [walk] = taps.length
+    ? await d
+        .collection(TAPS)
+        .aggregate([
+          { $match: { personId: s.personId } },
+          { $group: { _id: null, ids: { $push: "$_id" } } },
+          { $graphLookup: { from: DERIVED, startWith: "$ids", connectFromField: "_id", connectToField: "derivedFrom", as: "closure" } },
+          { $project: { clips: { $filter: { input: "$closure", as: "n", cond: { $eq: ["$$n.kind", "clip"] } } } } },
+        ])
+        .toArray()
+        .catch(() => [] as { clips: { _id: ObjectId }[] }[])
+    : [];
+  const clipIds = ((walk?.clips ?? []) as { _id: ObjectId }[]).map((c) => String(c._id));
+  return { tapIds: taps.map((t) => String(t._id)), tasteId: taste ? String(taste._id) : "", clipIds, before, erased: null, verified: null, steps: ["accept"] };
 }
 
 async function erase(s: S): Promise<Partial<S>> {
@@ -83,10 +104,13 @@ async function erase(s: S): Promise<Partial<S>> {
 async function verify(s: S): Promise<Partial<S>> {
   killAt("verify");
   const d = await db();
-  const ids = (s.tapIds ?? []).filter((x) => ObjectId.isValid(x)).map((x) => new ObjectId(x));
-  const [recordsLeft, derivedPointingAtTaps, tombs] = await Promise.all([
+  const oid = (xs: string[]) => xs.filter((x) => ObjectId.isValid(x)).map((x) => new ObjectId(x));
+  const ids = oid([...(s.tapIds ?? []), ...(s.tasteId ? [s.tasteId] : [])]);
+  const clips = oid(s.clipIds ?? []);
+  const [recordsLeft, derivedPointingAtTaps, clipsLeft, tombs] = await Promise.all([
     recordsFor(s.personId),
     ids.length ? d.collection(DERIVED).countDocuments({ derivedFrom: { $in: ids } }) : Promise.resolve(0),
+    clips.length ? d.collection(DERIVED).countDocuments({ _id: { $in: clips } }) : Promise.resolve(0),
     d.collection(TOMBSTONES).countDocuments({ hmac: hmac(s.personId) }),
   ]);
   const tombstone = tombs > 0 || s.before === 0;
@@ -94,11 +118,11 @@ async function verify(s: S): Promise<Partial<S>> {
   const venues = s.erased?.receipt?.venues as { matchesWithoutYou: boolean }[] | undefined;
   const picksMatched = venues ? venues.every((v) => v.matchesWithoutYou) : null;
   // The job's guarantee is the delete itself; the pick check stays forget's own receipt line.
-  const ok = recordsLeft === 0 && derivedPointingAtTaps === 0 && tombstone;
-  const v = { ok, recordsLeft, derivedPointingAtTaps, tombstone, picksMatched };
+  const ok = recordsLeft === 0 && derivedPointingAtTaps === 0 && clipsLeft === 0 && tombstone;
+  const v = { ok, recordsLeft, derivedPointingAtTaps, clipsComposedFromYou: clips.length, clipsLeft, tombstone, picksMatched };
   await d.collection(TOMBSTONES).updateOne({ hmac: hmac(s.personId) }, { $set: { durableCheck: { ...v, steps: [...s.steps, "verify"], at: new Date() } } });
   // The guest's id and tap ids leave the job's state before its last checkpoint is written.
-  return { verified: v, personId: "", tapIds: [], steps: ["verify"] };
+  return { verified: v, personId: "", tapIds: [], tasteId: "", clipIds: [], steps: ["verify"] };
 }
 
 let saver: MongoDBSaver | null = null;
@@ -146,6 +170,8 @@ async function finish(threadId: string, final: S, resumed: boolean) {
       verified: Boolean(final.verified?.ok),
       recordsLeft: final.verified?.recordsLeft ?? null,
       derivedPointingAtYourTaps: final.verified?.derivedPointingAtTaps ?? null,
+      clipsComposedFromYou: final.verified?.clipsComposedFromYou ?? null,
+      clipsLeft: final.verified?.clipsLeft ?? null,
       checkpointsWritten: written,
       checkpointsLeft: left,
     },
