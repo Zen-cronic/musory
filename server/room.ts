@@ -1248,7 +1248,7 @@ async function resetInner() {
 
 // Demo seed: one guest, Jess, whose portable taste is techno-heavy from last weekend
 // at Basement 2. She is not checked in anywhere yet, so each scripted step lands the same way every run.
-export const FILM_GUEST = { id: "g-jess", name: "Jess" };
+export const DEMO_GUEST = { id: "g-jess", name: "Jess" };
 export function filmReset() {
   const run = resetChain.then(() => filmInner());
   resetChain = run.catch(() => {});
@@ -1259,23 +1259,23 @@ async function filmInner() {
   const d = await db();
   const at0 = Date.now() - 7 * DAY + 3600_000;
   const consent = await d.collection(CONSENTS).insertOne({
-    personId: FILM_GUEST.id, venueId: "basement", scopes: ["use_taste", "contribute_crowd"], grantedAt: new Date(at0), expiresAt: new Date(Date.now() + 8 * 3600_000),
+    personId: DEMO_GUEST.id, venueId: "basement", scopes: ["use_taste", "contribute_crowd"], grantedAt: new Date(at0), expiresAt: new Date(Date.now() + 8 * 3600_000),
   });
   const likes = ["t11", "t13", "t14", "t12"];
   await d.collection(TAPS).insertMany(
     likes.map((trackId, i) => {
       const at = new Date(at0 + i * 600_000);
       return {
-        personId: FILM_GUEST.id, venueId: "basement", playId: `past-basement-${trackId}-jess-${i}`, trackId, genre: byId.get(trackId)!.genre, signal: 1,
+        personId: DEMO_GUEST.id, venueId: "basement", playId: `past-basement-${trackId}-jess-${i}`, trackId, genre: byId.get(trackId)!.genre, signal: 1,
         at, expiresAt: new Date(at.getTime() + 180 * DAY), consentId: consent.insertedId, scope: "long", status: "current", contribute: true,
       };
     }),
   );
-  await rebuildTaste(FILM_GUEST.id);
+  await rebuildTaste(DEMO_GUEST.id);
   // Four more guests already in Copper Room, checked in with consent but no taps yet.
   for (let i = 1; i <= 4; i++) await checkinQuiet(`sim-${i}`, "copper");
   await Promise.all(VENUE_IDS.map((v) => refreshNow(v)));
-  return { ok: true, guest: FILM_GUEST, phone: `/p/${FILM_GUEST.id}?venue=copper`, consent: `/join?venue=copper&as=${FILM_GUEST.id}` };
+  return { ok: true, guest: DEMO_GUEST, phone: `/p/${DEMO_GUEST.id}?venue=copper`, consent: `/join?venue=copper&as=${DEMO_GUEST.id}` };
 }
 
 async function checkinQuiet(personId: string, venueId: VenueId) {
@@ -1295,7 +1295,7 @@ async function checkinQuiet(personId: string, venueId: VenueId) {
 }
 
 /**
- * Simulated guests (to try a room without phones): five seeded guests check in to a room and tap
+ * Simulated guests (to show the room without phones): five seeded guests check in to a room and tap
  * "I like this" on two short samples of one sound. Deterministic: same guests, same samples, same order.
  * Default sound: disco if the room is playing something hard (techno, trance, drum & bass), otherwise techno.
  */
