@@ -20,7 +20,7 @@ Afterwards 0 records about you are left, and each room plays the track it said i
 ![How Musory works: the guest's phone, the server, MongoDB Atlas and the room screens](docs/architecture.png)
 
 - **Watch the 1-minute video:** [VIDEO URL]
-- **Try it:** the live room runs from the team's laptop during the event. Watch the 1-minute video to see it.
+- **Try it:** watch the 1-minute video to see it.
 
 ## What it does
 
