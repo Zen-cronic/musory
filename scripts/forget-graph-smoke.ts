@@ -22,7 +22,7 @@ async function hydrateRooms() {
   const d = await db();
   for (const v of VENUE_IDS) {
     const p = await d.collection(PLAYS).find({ venueId: v }).sort({ startedAt: -1 }).limit(1).next();
-    if (p) rooms[v].play = { playId: String(p._id), trackId: String(p.trackId), startedAt: +p.startedAt, endsAt: +p.endsAt };
+    if (p) rooms[v].play = { playId: String(p._id), trackId: String(p.trackId), startedAt: +p.startedAt, endsAt: +p.endsAt, memoryChangedPick: false, baselinePick: null } as never;
     rooms[v].next = await d.collection(DERIVED).find({ kind: "decision", venueId: v }).sort({ at: -1 }).limit(1).next();
   }
 }
@@ -86,7 +86,7 @@ async function variant(killAt: "erase" | "verify") {
   const job = all.find((x) => x.durable && x.durable.steps) ?? mine;
   const left = await records(personId);
   const tombs = await tombstones(personId);
-  check(`resumed after kill at ${killAt}`, b.code === 0 && Boolean(job?.durable?.resumed), { exit: b.code, resumedAt: job?.resumedAt, steps: job?.durable?.steps, erase: job?.durable?.erase, stderr: b.code ? b.err : undefined });
+  check(`resumed after kill at ${killAt}`, b.code === 0 && Boolean(job?.durable?.resumed), { exit: b.code, resumedAfter: job?.resumedAfter, steps: job?.durable?.steps, erase: job?.durable?.erase, stderr: b.code ? b.err : undefined });
   check("each step ran once", JSON.stringify(job?.durable?.steps) === JSON.stringify(["accept", "erase", "verify"]), job?.durable?.steps);
   check(killAt === "erase" ? "the delete happened after the restart" : "the delete was not repeated", killAt === "erase" ? job?.durable?.erase === "ran" : job?.durable?.erase === "already erased before a restart", job?.durable?.erase);
   check("verified: 0 records, nothing derived points at the taps, tombstone", job?.durable?.verified === true, { recordsLeft: job?.durable?.recordsLeft, derived: job?.durable?.derivedPointingAtYourTaps });

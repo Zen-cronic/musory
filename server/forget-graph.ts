@@ -35,8 +35,8 @@ const State = Annotation.Root({
   personId: Annotation<string>(),
   tapIds: Annotation<string[]>(),
   before: Annotation<number>(),
-  erase: Annotation<{ ran: boolean; skipped?: string; receipt?: Record<string, any> } | null>(),
-  verify: Annotation<{ ok: boolean; recordsLeft: number; derivedPointingAtTaps: number; tombstone: boolean; picksMatched: boolean | null } | null>(),
+  erased: Annotation<{ ran: boolean; skipped?: string; receipt?: Record<string, any> } | null>(),
+  verified: Annotation<{ ok: boolean; recordsLeft: number; derivedPointingAtTaps: number; tombstone: boolean; picksMatched: boolean | null } | null>(),
   steps: Annotation<string[]>({ reducer: (a, b) => a.concat(b), default: () => [] }),
 });
 type S = typeof State.State;
@@ -65,19 +65,19 @@ const killAt = (step: string) => {
 async function accept(s: S): Promise<Partial<S>> {
   const d = await db();
   const taps = await d.collection(TAPS).find({ personId: s.personId }, { projection: { _id: 1 } }).toArray();
-  return { tapIds: taps.map((t) => String(t._id)), before: await recordsFor(s.personId), erase: null, verify: null, steps: ["accept"] };
+  return { tapIds: taps.map((t) => String(t._id)), before: await recordsFor(s.personId), erased: null, verified: null, steps: ["accept"] };
 }
 
 async function erase(s: S): Promise<Partial<S>> {
   killAt("erase");
   if ((await recordsFor(s.personId)) > 0) {
     const receipt = (await forget(s.personId)) as Record<string, any>;
-    return { erase: { ran: true, receipt }, steps: ["erase"] };
+    return { erased: { ran: true, receipt }, steps: ["erase"] };
   }
   // Nothing left: either an earlier attempt committed the delete before a restart, or there was nothing.
   const d = await db();
   const tomb = await d.collection(TOMBSTONES).countDocuments({ hmac: hmac(s.personId) });
-  return { erase: { ran: false, skipped: tomb ? "already erased before a restart" : "nothing to erase" }, steps: ["erase"] };
+  return { erased: { ran: false, skipped: tomb ? "already erased before a restart" : "nothing to erase" }, steps: ["erase"] };
 }
 
 async function verify(s: S): Promise<Partial<S>> {
@@ -88,14 +88,14 @@ async function verify(s: S): Promise<Partial<S>> {
   const derivedPointingAtTaps = ids.length ? await d.collection(DERIVED).countDocuments({ derivedFrom: { $in: ids } }) : 0;
   const tombstone = (await d.collection(TOMBSTONES).countDocuments({ hmac: hmac(s.personId) })) > 0 || s.before === 0;
   // The pick check needs the rooms as forget left them, so it only applies when erase ran in this process.
-  const venues = s.erase?.receipt?.venues as { matchesWithoutYou: boolean }[] | undefined;
+  const venues = s.erased?.receipt?.venues as { matchesWithoutYou: boolean }[] | undefined;
   const picksMatched = venues ? venues.every((v) => v.matchesWithoutYou) : null;
   // The job's guarantee is the delete itself; the pick check stays forget's own receipt line.
   const ok = recordsLeft === 0 && derivedPointingAtTaps === 0 && tombstone;
   const v = { ok, recordsLeft, derivedPointingAtTaps, tombstone, picksMatched };
   await d.collection(TOMBSTONES).updateOne({ hmac: hmac(s.personId) }, { $set: { durableCheck: { ...v, steps: [...s.steps, "verify"], at: new Date() } } });
   // The guest's id and tap ids leave the job's state before its last checkpoint is written.
-  return { verify: v, personId: "", tapIds: [], steps: ["verify"] };
+  return { verified: v, personId: "", tapIds: [], steps: ["verify"] };
 }
 
 let saver: MongoDBSaver | null = null;
@@ -132,17 +132,17 @@ async function finish(threadId: string, final: S, resumed: boolean) {
   const written = await checkpointDocs(threadId);
   await saver.deleteThread(threadId);
   const left = await checkpointDocs(threadId);
-  const receipt = final.erase?.receipt ?? { totalBefore: final.before ?? 0, totalAfter: 0, venues: [] };
+  const receipt = final.erased?.receipt ?? { totalBefore: final.before ?? 0, totalAfter: 0, venues: [] };
   return {
     ...receipt,
     durable: {
       engine: "LangGraph + MongoDBSaver",
       steps: final.steps,
       resumed,
-      erase: final.erase?.ran ? "ran" : final.erase?.skipped ?? "unknown",
-      verified: Boolean(final.verify?.ok),
-      recordsLeft: final.verify?.recordsLeft ?? null,
-      derivedPointingAtYourTaps: final.verify?.derivedPointingAtTaps ?? null,
+      erase: final.erased?.ran ? "ran" : final.erased?.skipped ?? "unknown",
+      verified: Boolean(final.verified?.ok),
+      recordsLeft: final.verified?.recordsLeft ?? null,
+      derivedPointingAtYourTaps: final.verified?.derivedPointingAtTaps ?? null,
       checkpointsWritten: written,
       checkpointsLeft: left,
     },
@@ -158,7 +158,8 @@ export async function runForgetGraph(personId: string) {
   if (inflight) return inflight;
   const job = (async () => {
     const { graph } = await ready();
-    const cfg = { configurable: { thread_id: threadId } };
+    // "sync": each step's checkpoint is in Atlas before the next step starts.
+    const cfg = { configurable: { thread_id: threadId }, durability: "sync" as const };
     const final = (await graph.invoke({ personId, steps: [] } as never, cfg)) as S;
     return finish(threadId, final, false);
   })();
@@ -177,14 +178,14 @@ export async function resumePending() {
   const threads = (await d.collection(CHECKPOINTS).distinct("thread_id", { thread_id: { $regex: `^${THREAD_PREFIX}` } })) as string[];
   const out: unknown[] = [];
   for (const threadId of threads) {
-    const cfg = { configurable: { thread_id: threadId } };
+    const cfg = { configurable: { thread_id: threadId }, durability: "sync" as const };
     try {
       const state = await graph.getState(cfg);
-      const unfinished = (state.next ?? []).length > 0;
+      const unfinished = (state.next ?? []).length > 0 || !(state.values as S).verified;
       const final = unfinished ? ((await graph.invoke(null as never, cfg)) as S) : (state.values as S);
       const r = await finish(threadId, final, unfinished);
-      out.push({ resumedAt: unfinished ? state.next : null, durable: (r as { durable: unknown }).durable });
-      console.log(`forget graph: ${unfinished ? `resumed at ${state.next.join(",")}` : "cleaned a finished job"}`);
+      out.push({ resumedAfter: unfinished ? (state.values as S).steps ?? [] : null, durable: (r as { durable: unknown }).durable });
+      console.log(`forget graph: ${unfinished ? `resumed after ${(state.values as S).steps?.join(",") || "start"}` : "cleaned a finished job"}`);
     } catch (e) {
       console.error("forget graph: resume failed", redactError(e).message);
     }
