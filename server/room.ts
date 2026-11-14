@@ -478,6 +478,8 @@ export function queueClip(venueId: VenueId, meta: ClipMeta) {
   genClips.set(m.trackId, m);
   rooms[venueId].queued = m;
 }
+// Bumped by every forget me: a track still being composed when a guest is forgotten is thrown away.
+export let forgetEpoch = 0;
 // Venues whose next pick follows a simulated-guests run: live music may compose sooner for them.
 export const composeSoon = new Set<VenueId>();
 // Live music registers here: it hears every new pick, and tells the room when a track is being made.
@@ -813,6 +815,7 @@ async function countFor(personId: string, session?: ClientSession) {
 }
 
 export async function forget(personId: string) {
+  forgetEpoch++;
   VENUE_IDS.forEach((v) => hold.add(v));
   try {
     return await forgetInner(personId);

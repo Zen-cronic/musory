@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ObjectId, type Document } from "mongodb";
 import { db, DERIVED, VENUES, type VenueId } from "./db.js";
+import * as room from "./room.js";
 import { fail, rooms, queueClip, advance, setDecisionHook, setComposingCheck, currentGenre, composeSoon } from "./room.js";
 import { TRACKS, byId } from "./catalog.js";
 import { emit } from "./events.js";
@@ -22,7 +23,6 @@ const CLIP_MS = 15_000;
 const FALLBACK_MS = Number(process.env.MUSIC_FALLBACK_MS || 10_000); // after this, play the closest catalogue track
 // At most one composition per room every 20 s for guests' taps; 8 s in stage mode and after simulated guests.
 const MIN_GAP_MS = Number(process.env.MUSIC_GAP_MS || (process.env.STAGE === "1" ? 8_000 : 20_000));
-const SOON_GAP_MS = Number(process.env.MUSIC_SOON_GAP_MS || 8_000);
 const MAX_PER_DAY = Number(process.env.LIVE_MUSIC_MAX || 60);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const GEN_DIR = path.join(root, "public", "audio", "gen");
@@ -89,10 +89,14 @@ export async function generateFromRoom(venueId: VenueId, opts: { reason?: string
     return await composeFor(venueId, opts);
   } finally {
     busy.delete(venueId);
+    // Simulated guests tapped while this room was busy: make their track now.
+    if (pendingSoon.delete(venueId)) setTimeout(() => void generateFromRoom(venueId, { reason: "simulated guests" }).catch(() => {}), 0);
   }
 }
+const pendingSoon = new Set<VenueId>();
 
 async function composeFor(venueId: VenueId, opts: { reason?: string }) {
+  const epoch = room.forgetEpoch;
   const decision = rooms[venueId].next as Document | null;
   // Lineage, like crowd memory: the tap ids behind the tastes and crowd memory in this blend. No guest ids.
   const d0 = await db();
@@ -118,6 +122,7 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
   // Fallback: if the new track isn't here in 10 s, play the closest catalogue track now.
   let fellBack = false;
   const timer = setTimeout(async () => {
+    if (room.forgetEpoch !== epoch) return; // a guest was forgotten meanwhile; forget already re-picked the room
     fellBack = true;
     emit("music_fallback", { venueId, reason: "slow", text: "Playing the closest track we have", afterMs: FALLBACK_MS });
     await advance(venueId).catch(() => {});
@@ -131,6 +136,12 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
       mode = "prompt";
       const prompt = `Instrumental club track, ${bpm} BPM: ${genres.join(" with ")}. ${stylesFor(genres[0] ?? "house").slice(1, 4).join(", ")}.`;
       audio = await compose({ model_id: MUSIC_MODEL, prompt, music_length_ms: CLIP_MS, force_instrumental: true });
+    }
+    if (room.forgetEpoch !== epoch) {
+      // Someone in this blend said forget me while the track was being made: throw it away unplayed.
+      clearTimeout(timer);
+      emit("music_discarded", { venueId, reason: "a guest in this blend said forget me", ms: Date.now() - t0 });
+      return { ok: false, venueId, discarded: true };
     }
     const id = new ObjectId();
     mkdirSync(GEN_DIR, { recursive: true });
@@ -183,11 +194,19 @@ setComposingCheck((v) => busy.has(v));
 // The trigger: a new pick whose leading sound differs from what the room is playing starts a composition
 // right away, in parallel with the current clip.
 setDecisionHook((venueId, decision) => {
-  if (!liveMusicOn() || !hasMusicKey() || busy.has(venueId)) return;
+  if (!liveMusicOn() || !hasMusicKey()) return;
+  // Simulated guests always get a fresh track (no gap, no same-sound check; the daily cap still applies).
   const soon = composeSoon.has(venueId);
-  if (Date.now() - (lastStart[venueId] ?? 0) < (soon ? SOON_GAP_MS : MIN_GAP_MS)) return;
+  if (busy.has(venueId)) {
+    if (soon) {
+      composeSoon.delete(venueId);
+      pendingSoon.add(venueId);
+    }
+    return;
+  }
+  if (!soon && Date.now() - (lastStart[venueId] ?? 0) < MIN_GAP_MS) return;
   const leading = leadingOf(decision.mix as Record<string, number>);
-  if (!leading || leading === currentGenre(venueId) || leading === lastLeading[venueId]) return;
+  if (!soon && (!leading || leading === currentGenre(venueId) || leading === lastLeading[venueId])) return;
   const people = ((decision.sharingCount as number) ?? 0) + ((decision.crowdContributors as number) ?? 0);
   if (!(decision.sharingCount as number) || people < 3) return;
   composeSoon.delete(venueId);

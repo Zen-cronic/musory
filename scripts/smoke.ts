@@ -46,6 +46,7 @@ check("the tap is saved with track, venue and time", Boolean(tap?.trackId && tap
 // 2. Taste carries to Basement 2 at once.
 const before = (await room("basement")).next;
 await api("/api/checkin", { personId: guest, venueId: "basement" });
+await sleep(2000); // the room re-picks right after the check-in
 r = await room("basement");
 check("taste applies at Basement 2 immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
 
