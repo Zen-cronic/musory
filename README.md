@@ -1,6 +1,6 @@
 # Musory
 
-**Toronto nightlife is shrinking: one venue's busy weekend nights bring in close to half what they did in 2019** ([CBC](https://www.cbc.ca/radio/costofliving/canada-nightlife-decline-9.6993902)).
+**Bars play one playlist for everyone, and the apps that let guests shape the music keep their likes on view with no easy way to take them back.**
 
 **Your bar learns what its crowd likes and makes music for it. One tap makes every venue forget you.**
 
@@ -21,6 +21,8 @@ Afterwards the checked collections hold 0 records with your guest id, and the ro
 
 - **Watch the 1-minute video:** [VIDEO URL]
 - **Try it:** watch the 1-minute video to see it.
+
+Toronto nightlife is shrinking ([CBC](https://www.cbc.ca/radio/costofliving/canada-nightlife-decline-9.6993902)), so venues need guests to come back. This is a prototype with simulated venues. A venue pilot would test whether guests prefer its choices.
 
 ## Screens
 
