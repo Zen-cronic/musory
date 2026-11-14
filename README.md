@@ -9,7 +9,7 @@ Bars and clubs play one playlist for everyone. I love electronic music. Not ever
 ## What a guest does
 
 1. Scan the venue's QR code and choose what to share.
-2. Tap **I like this** on what's playing. The room picks its next track from the people there.
+2. Swipe the track that's playing: right to like, left to skip. Or type what you want, like "something dark and driving". The room picks its next track from the people there.
 3. When the crowd's likes shift, ElevenLabs Music makes a new track for them and the room crossfades into it.
 
 ## What forget me does
@@ -32,8 +32,10 @@ Toronto nightlife is shrinking ([CBC](https://www.cbc.ca/radio/costofliving/cana
 | The landing page. | The room screen: now playing, the next track with memory, and how to check in. |
 | ![The room making a new track](docs/gallery/3-room-making.webp) | ![The stage screen](docs/gallery/6-stage.webp) |
 | The room makes a new track when the crowd moves it. | The stage screen for a projector: check in, and how many people shape the music. |
-| ![How it works, live](docs/gallery/7-how.webp) | <img src="docs/gallery/4-phone.webp" alt="The guest page" width="45%"> <img src="docs/gallery/5-forget-receipt.webp" alt="The forget me receipt" width="45%"> |
-| How it works, live: each box lights up when its step runs. | The guest page, and the receipt after forget me. |
+| ![How it works, live](docs/gallery/7-how.webp) | <img src="docs/gallery/4-phone.webp" alt="The guest page" width="45%"> <img src="docs/gallery/8-forgetting.webp" alt="Forget me in progress" width="45%"> |
+| How it works, live: each box lights up when its step runs. | The guest page (swipe to like or skip, or type what you want), and forget me ticking off each step as it finishes. |
+| <img src="docs/gallery/5-forget-receipt.webp" alt="The forget me receipt" width="45%"> | |
+| The receipt after forget me, with a fresh start or done. | |
 
 ## What it does
 

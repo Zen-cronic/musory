@@ -4,36 +4,51 @@
 <link rel="stylesheet" href="../public/css/musory.css">
 <style>
 body { width: 1600px; height: 1000px; overflow: hidden; background-attachment: scroll; }
-.wrap { padding: 56px 72px; display: grid; gap: 44px; }
+.wrap { padding: 60px 90px; display: grid; gap: 60px; }
 .head { display: flex; align-items: center; gap: 22px; }
 .head h1 { font-size: 56px; }
-.sysmap { gap: 56px 64px; }
-.sysmap .bx { min-height: 150px; padding: 22px; }
-.sysmap .bx .lg { height: 34px; } .sysmap .bx .lg img { height: 26px; }
-.sysmap .bx .lg .chipname { font-size: 30px; }
-.sysmap .bx b { font-size: 21px; }
-.sysmap .row1 + .row1::before { left: -60px; width: 54px; }
-.sysmap .down::after { bottom: -53px; height: 50px; }
-.steps-list { grid-template-columns: repeat(5, 1fr); gap: 20px; }
-.steps-list li { grid-template-columns: 1fr; font-size: 18px; }
+.map { gap: 90px 200px; }
 </style></head>
 <body><div class="wrap"><header class="head"><span class="wordmark lg">Musory</span><h1 class="display">How it works</h1></header>
-<div class="sysmap" aria-label="How Musory is built">
-  <div class="bx row1" id="n-tap"><span class="num">1</span><span class="lg"><span class="chipname">Phone</span></span><b>Check in, like, forget me</b></div>
-  <div class="bx row1 down" id="n-server"><span class="lg"><span class="chipname">Server</span></span><b>Blends the crowd's taste</b></div>
-  <div class="bx row1" id="n-room"><span class="lg"><span class="chipname">Room screen</span></span><b>Plays the next track</b></div>
-  <div class="bx row1" id="n-play"><span class="num">4</span><span class="lg"><span class="logo-chip"><img src="../public/img/elevenlabs.svg" alt="ElevenLabs" style="height:12px"></span></span><b>Music makes new tracks</b></div>
-  <div class="bx" id="n-embed"><span class="num">3</span><span class="lg"><span class="logo-chip"><img src="../public/img/voyage.svg" alt="Voyage AI"></span></span><b>Tracks and tastes as vectors</b></div>
-  <div class="bx atlas" id="n-change"><span class="num">2</span><span class="lg"><span class="logo-chip"><img src="../public/img/mongodb.svg" alt="MongoDB Atlas"></span></span><b>Every memory and its rules. Vector Search picks the next track.</b></div>
-  <div class="bx" id="n-lang"><span class="num">5</span><span class="lg"><span class="chipname">LangGraph</span></span><b>With LangSmith, checks forget me</b></div>
+<div class="map" id="map" aria-label="How Musory is built">
+  <svg class="wires" aria-hidden="true"></svg>
+  <div></div>
+  <div class="nd" id="n-embed"><span class="lg"><span class="logo-chip"><img src="../public/img/voyage.svg" alt="Voyage AI"></span></span><span class="cap">Embeds tracks</span></div>
+  <div></div>
+  <div class="nd" id="n-tap"><span class="word">Phone</span><span class="cap">Swipe and type</span></div>
+  <div class="nd big" id="n-change"><span class="lg"><span class="logo-chip"><img src="../public/img/mongodb.svg" alt="MongoDB Atlas"></span></span><span class="cap">Picks and forgets</span></div>
+  <div class="nd" id="n-room"><span class="word">Room</span><span class="cap">Plays it</span></div>
+  <div class="nd" id="n-lang"><span class="word">LangGraph</span><span class="cap">Checks forget me</span></div>
+  <div></div>
+  <div class="nd" id="n-play"><span class="lg"><span class="logo-chip"><img src="../public/img/elevenlabs.svg" alt="ElevenLabs Music" style="height:16px"></span></span><span class="cap">Makes the track</span></div>
 </div>
-<ol class="steps-list">
-  <li><span class="n">1</span>A guest checks in on their phone and taps I like this.</li>
-  <li><span class="n">2</span>Atlas saves it under the venue's rules and tells the room at once.</li>
-  <li><span class="n">3</span>Voyage AI vectors and Atlas Vector Search pick the next track for the people here.</li>
-  <li><span class="n">4</span>When the crowd moves, ElevenLabs Music makes a new track for the room.</li>
-  <li><span class="n">5</span>Forget me deletes it all in one transaction. LangGraph checks it, LangSmith tests it.</li>
-</ol>
 
+</div>
+<script>
+// Draws the arrows between map nodes: [from, to, label]
+function drawMap(root, links) {
+  const svg = root.querySelector("svg.wires");
+  const draw = () => {
+    root.querySelectorAll(".wl").forEach((x) => x.remove());
+    svg.innerHTML = '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#B1FF05"/></marker></defs>';
+    const R = root.getBoundingClientRect();
+    for (const [a, b, label] of links) {
+      const A = root.querySelector(a).getBoundingClientRect(), B = root.querySelector(b).getBoundingClientRect();
+      const ax = A.left + A.width / 2 - R.left, ay = A.top + A.height / 2 - R.top, bx = B.left + B.width / 2 - R.left, by = B.top + B.height / 2 - R.top;
+      // Clip both ends to the box edges
+      const edge = (cx, cy, box, dx, dy) => { const hw = box.width / 2 + 8, hh = box.height / 2 + 8; const t = Math.min(dx ? hw / Math.abs(dx) : Infinity, dy ? hh / Math.abs(dy) : Infinity); return [cx + dx * t, cy + dy * t]; };
+      const dx = bx - ax, dy = by - ay;
+      const [x1, y1] = edge(ax, ay, A, dx, dy), [x2, y2] = edge(bx, by, B, -dx, -dy);
+      svg.insertAdjacentHTML("beforeend", `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#B1FF05" stroke-width="2.5" marker-end="url(#ah)"/>`);
+      if (label) { const l = document.createElement("span"); l.className = "wl"; l.textContent = label; l.style.left = `${(x1 + x2) / 2}px`; l.style.top = `${(y1 + y2) / 2}px`; l.style.translate = "-50% -50%"; root.appendChild(l); }
+    }
+  };
+  draw();
+  addEventListener("resize", draw);
+  document.fonts?.ready.then(draw);
+}
+const MAP_LINKS = [["#n-tap", "#n-change", "Likes"], ["#n-embed", "#n-change", "Vectors"], ["#n-change", "#n-room", "Next track"], ["#n-play", "#n-room", "New track"], ["#n-lang", "#n-change", "Checks"]];
 
-</div></body></html>
+drawMap(document.getElementById("map"), MAP_LINKS);
+</script>
+</body></html>

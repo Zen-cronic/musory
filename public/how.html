@@ -65,22 +65,18 @@
   </header>
 
   <section class="overview">
-<div class="sysmap" aria-label="How Musory is built">
-  <div class="bx row1" id="n-tap"><span class="num">1</span><span class="lg"><span class="chipname">Phone</span></span><b>Check in, like, forget me</b></div>
-  <div class="bx row1 down" id="n-server"><span class="lg"><span class="chipname">Server</span></span><b>Blends the crowd's taste</b></div>
-  <div class="bx row1" id="n-room"><span class="lg"><span class="chipname">Room screen</span></span><b>Plays the next track</b></div>
-  <div class="bx row1" id="n-play"><span class="num">4</span><span class="lg"><span class="logo-chip"><img src="/img/elevenlabs.svg" alt="ElevenLabs" style="height:12px"></span></span><b>Music makes new tracks</b></div>
-  <div class="bx" id="n-embed"><span class="num">3</span><span class="lg"><span class="logo-chip"><img src="/img/voyage.svg" alt="Voyage AI"></span></span><b>Tracks and tastes as vectors</b></div>
-  <div class="bx atlas" id="n-change"><span class="num">2</span><span class="lg"><span class="logo-chip"><img src="/img/mongodb.svg" alt="MongoDB Atlas"></span></span><b>Every memory and its rules. Vector Search picks the next track.</b></div>
-  <div class="bx" id="n-lang"><span class="num">5</span><span class="lg"><span class="chipname">LangGraph</span></span><b>With LangSmith, checks forget me</b></div>
+<div class="map" id="map" aria-label="How Musory is built">
+  <svg class="wires" aria-hidden="true"></svg>
+  <div></div>
+  <div class="nd" id="n-embed"><span class="lg"><span class="logo-chip"><img src="/img/voyage.svg" alt="Voyage AI"></span></span><span class="cap">Embeds tracks</span></div>
+  <div></div>
+  <div class="nd" id="n-tap"><span class="word">Phone</span><span class="cap">Swipe and type</span></div>
+  <div class="nd big" id="n-change"><span class="lg"><span class="logo-chip"><img src="/img/mongodb.svg" alt="MongoDB Atlas"></span></span><span class="cap">Picks and forgets</span></div>
+  <div class="nd" id="n-room"><span class="word">Room</span><span class="cap">Plays it</span></div>
+  <div class="nd" id="n-lang"><span class="word">LangGraph</span><span class="cap">Checks forget me</span></div>
+  <div></div>
+  <div class="nd" id="n-play"><span class="lg"><span class="logo-chip"><img src="/img/elevenlabs.svg" alt="ElevenLabs Music" style="height:16px"></span></span><span class="cap">Makes the track</span></div>
 </div>
-<ol class="steps-list">
-  <li><span class="n">1</span>A guest checks in on their phone and taps I like this.</li>
-  <li><span class="n">2</span>Atlas saves it under the venue's rules and tells the room at once.</li>
-  <li><span class="n">3</span>Voyage AI vectors and Atlas Vector Search pick the next track for the people here.</li>
-  <li><span class="n">4</span>When the crowd moves, ElevenLabs Music makes a new track for the room.</li>
-  <li><span class="n">5</span>Forget me deletes it all in one transaction. LangGraph checks it, LangSmith tests it.</li>
-</ol>
   </section>
 
   <section class="lanes">
@@ -88,7 +84,7 @@
       <header><span class="logo-chip"><img src="/img/mongodb.svg" alt="MongoDB Atlas"></span><span class="kicker on-bg">Atlas</span></header>
       <div class="surface card" data-testid="viz-vector-search">
         <h3 id="vs-title">Vector search: the next track</h3>
-        <p class="plain" id="vs-plain">Waiting for the next pick.</p>
+        <p class="plain" id="vs-plain"></p>
         <div class="matches" id="vs-matches"></div>
       </div>
       <div class="surface card" data-testid="viz-forget">
@@ -108,18 +104,18 @@
       </div>
       <div class="surface card">
         <h3 id="cs-title">Change stream</h3>
-        <p class="plain" id="cs-plain">Atlas pushes every saved change to the room screens. No polling.</p>
+        <p class="plain" id="cs-plain">Every saved change reaches the room at once.</p>
       </div>
     </div>
     <div class="lane">
       <header><span class="logo-chip"><img src="/img/voyage.svg" alt="Voyage AI"></span><span class="kicker on-bg">and</span><span class="logo-chip"><img src="/img/elevenlabs.svg" alt="ElevenLabs" style="height:11px"></span></header>
       <div class="surface card" data-testid="viz-voyage">
         <h3>How the next track is aimed</h3>
-        <p class="rule">Voyage AI turns each track's written description into a vector. The room's search vector blends <b>the taste of the people here, 60%</b>, <b>the venue's crowd memory, 25%</b> and <b>the current track, 15%</b>. Anyone who just checked in or tapped in the last two minutes counts three times.</p>
+        <p class="rule"><b>People here 60%</b>, <b>venue memory 25%</b>, <b>current track 15%</b>. Recent taps count three times.</p>
       </div>
       <div class="slab card" data-testid="viz-music">
         <span class="kicker">ElevenLabs Music</span>
-        <p class="prompt" id="mu-prompt">Every clip was made from a short description. No artist or song is ever named.</p>
+        <p class="prompt" id="mu-prompt">Made from genre, tempo and texture words only.</p>
         <p class="plain" id="mu-plain"></p>
         <div class="progress"><div id="mu-progress"></div></div>
       </div>
@@ -129,6 +125,8 @@
 <script type="module">
 import { api, events, $, genreName, refusalTicket, progress } from "/js/common.js";
 import { params, settle } from "/js/look.js";
+import { drawMap, MAP_LINKS } from "/js/map.js";
+drawMap(document.getElementById("map"), MAP_LINKS);
 const only = params.get("venue");
 const names = { copper: "Copper Bar", basement: "Pulse Club" };
 const mine = (e) => !only || !e.venueId || e.venueId === only;
@@ -137,7 +135,7 @@ function vectorSearch(e) {
   light("n-embed"); light("n-change"); light("n-server");
   const people = e.sharing || 0;
   $("vs-title").textContent = `Vector search: the next track for ${names[e.venueId] || "the room"}`;
-  $("vs-plain").textContent = people ? `Searched with the blended taste of ${people} ${people === 1 ? "person" : "people"} here, at tonight's energy. Closer to 1 means a closer match.` : `No one here shares their taste yet, so it searched with the venue's crowd memory. Closer to 1 means a closer match.`;
+  $("vs-plain").textContent = people ? `The taste of ${people} ${people === 1 ? "person" : "people"} here. Closer to 1 is closer.` : `Venue memory only. Closer to 1 is closer.`;
   const top = (e.topK || []).slice(0, 5);
   const hi = Math.max(...top.map((t) => t.score)), lo = Math.min(...top.map((t) => t.score));
   const w = (sc) => Math.round(35 + 65 * (hi > lo ? (sc - lo) / (hi - lo) : 1));

@@ -87,15 +87,15 @@
   .round.like { background: var(--band-bg, var(--band)); color: var(--on-band); border-color: transparent; }
   .vibe label h2 { font-size: calc(22px * var(--dscale)); }
   .vibe form { display: flex; gap: 8px; }
-  .vibe input { flex: 1; font: inherit; font-size: 17px; min-height: 48px; padding: 0 12px; border: 2px solid currentColor; background: var(--surface); color: var(--text); }
+  .vibe input { flex: 1; border-radius: 10px; font: inherit; font-size: 17px; min-height: 48px; padding: 0 12px; border: 2px solid currentColor; background: var(--surface); color: var(--text); }
   .more > summary { list-style: none; cursor: pointer; }
   .more > summary::-webkit-details-marker { display: none; }
   .more:not([open]) .sheet { display: none; }
-  .more[open] .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; z-index: 30; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); display: grid; gap: 12px; background: var(--bg); background-image: var(--fields, none); box-shadow: 0 -2px 0 var(--slab-line); }
+  .more[open] .sheet { border-radius: 14px 14px 0 0; position: fixed; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; z-index: 30; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); display: grid; gap: 12px; background: var(--bg); background-image: var(--fields, none); box-shadow: 0 -2px 0 var(--slab-line); }
   .sheet-head { display: flex; justify-content: space-between; align-items: center; }
   .sheet-head h2 { font-size: 28px; }
   .btn.toggle[aria-pressed="true"] { background: var(--on-bg); color: var(--bg); }
-  .snackbar { position: fixed; left: 16px; right: 16px; bottom: 18px; z-index: 35; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: var(--on-bg); color: var(--bg); font-weight: 700; }
+  .snackbar { border-radius: 8px; position: fixed; left: 16px; right: 16px; bottom: 18px; z-index: 35; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: var(--on-bg); color: var(--bg); font-weight: 700; }
   .snackbar .btn { border-color: currentColor; min-height: 44px; }
   .forgetting { position: fixed; inset: 0; z-index: 19; padding: 22px 18px; display: flex; flex-direction: column; gap: 18px; background: var(--bg); background-image: var(--fields, none); }
   .forgetting h1 { font-size: calc(48px * var(--dscale)); }
