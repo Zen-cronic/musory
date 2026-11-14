@@ -238,15 +238,17 @@ $("bored").addEventListener("click", () => { $("more").open = false; });
   const card = $("swipe-card");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let x0 = null, dx = 0;
+  // One gentle nudge on first load shows the card can be swiped
+  if (!reduce) { card.classList.add("nudge"); card.addEventListener("animationend", () => card.classList.remove("nudge"), { once: true }); }
   const stamps = (v) => { card.querySelector(".stamp-like").style.opacity = Math.max(0, Math.min(1, v / 90)); card.querySelector(".stamp-skip").style.opacity = Math.max(0, Math.min(1, -v / 90)); };
   const reset = () => { card.classList.remove("dragging"); card.style.transform = ""; stamps(0); };
   card.addEventListener("pointerdown", (e) => { x0 = e.clientX; dx = 0; card.classList.add("dragging"); card.setPointerCapture(e.pointerId); });
-  card.addEventListener("pointermove", (e) => { if (x0 === null) return; dx = e.clientX - x0; card.style.transform = `translateX(${dx}px)`; stamps(dx); });
+  card.addEventListener("pointermove", (e) => { if (x0 === null) return; dx = e.clientX - x0; card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`; stamps(dx); });
   const end = () => {
     if (x0 === null) return; x0 = null;
     const go = dx > 90 ? "like" : dx < -90 ? "skip" : null;
     card.classList.remove("dragging");
-    if (go && !reduce) { card.style.transform = `translateX(${go === "like" ? 120 : -120}%)`; setTimeout(reset, 220); } else reset();
+    if (go && !reduce) { card.style.transform = `translateX(${go === "like" ? 130 : -130}%) rotate(${go === "like" ? 18 : -18}deg)`; setTimeout(reset, 220); } else reset();
     if (go) $(go).click();
   };
   card.addEventListener("pointerup", end);
