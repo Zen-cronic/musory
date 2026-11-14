@@ -148,12 +148,15 @@ async function runScenario(inp: Record<string, any>) {
     crossVenue = await api("POST", "/api/proof/cross-venue");
     ownVenue = await api("POST", "/api/proof/own-venue");
   }
+  const tForget = Date.now();
   const receipt = await api("POST", "/api/forget", { personId });
+  const forgetMs = Date.now() - tForget;
   const meAfter = await api("GET", `/api/me?personId=${personId}`);
   const scan = await scanFor(personId);
   return {
     personId,
     ms: Date.now() - t0,
+    forgetMs,
     tapsBefore: meBefore.taps?.length ?? 0,
     tonightTapsBefore: (meBefore.taps ?? []).filter((t: any) => t.scope === "tonight").length,
     tasteEvidenceBefore: meBefore.taste?.evidence ?? 0,
@@ -191,7 +194,7 @@ const guaranteeEvaluators = ([
   ({ outputs }: any) => ({
     key: "forget_zero_records",
     score: outputs.receipt.totalBefore > 0 && outputs.receipt.totalAfter === 0 && outputs.after.taps === 0 && !outputs.after.taste && outputs.after.consents === 0 && !outputs.after.venue && (outputs.receipt.durable ? outputs.receipt.durable.checkpointsLeft === 0 : true) ? 1 : 0,
-    comment: `records before ${outputs.receipt.totalBefore}, after ${outputs.receipt.totalAfter}`,
+    comment: `records before ${outputs.receipt.totalBefore}, after ${outputs.receipt.totalAfter}; forget took ${outputs.forgetMs} ms${outputs.receipt.durable ? `; durable job ${JSON.stringify(outputs.receipt.durable)}` : " (direct path)"}`,
   }),
   ({ outputs }: any) => ({
     key: "forget_matches_pick_without_you",
@@ -306,6 +309,7 @@ async function main() {
   let passed = 0;
   let errors = 0;
   const perSet: Record<string, Record<string, number>> = {};
+  const forgetTimes: number[] = [];
   for (const row of res.results) {
     if (isFind) {
       const set = String(row.example.inputs.set);
@@ -314,6 +318,7 @@ async function main() {
       for (const r of row.evaluationResults.results) if (r.score === 1) perSet[set][r.key.replace("hit_at_1_", "")]++;
     }
     if (row.run.error) errors++;
+    if (typeof row.run.outputs?.forgetMs === "number") forgetTimes.push(row.run.outputs.forgetMs);
     let ok = !row.run.error;
     for (const r of row.evaluationResults.results) {
       const m = metrics.get(r.key) ?? { key: r.key, passed: 0, total: 0 };
@@ -337,7 +342,7 @@ async function main() {
     scenarios: picked.length,
     passed: isFind ? (m("hit_at_1_hybrid")?.passed ?? 0) : passed,
     metrics: list,
-    measured: isFind ? Object.fromEntries(Object.entries(perSet).map(([k, v]) => [k, `n ${v.n}: words ${v.words}, meaning ${v.meaning}, hybrid ${v.hybrid}`])) : { memoryChangedPick: `${m("memory_changed_pick")?.passed ?? 0}/${m("memory_changed_pick")?.total ?? 0}`, guestChangedPick: `${m("guest_changed_pick")?.passed ?? 0}/${m("guest_changed_pick")?.total ?? 0}`, errors },
+    measured: isFind ? Object.fromEntries(Object.entries(perSet).map(([k, v]) => [k, `n ${v.n}: words ${v.words}, meaning ${v.meaning}, hybrid ${v.hybrid}`])) : { memoryChangedPick: `${m("memory_changed_pick")?.passed ?? 0}/${m("memory_changed_pick")?.total ?? 0}`, guestChangedPick: `${m("guest_changed_pick")?.passed ?? 0}/${m("guest_changed_pick")?.total ?? 0}`, errors, forgetMsMedian: forgetTimes.sort((a, b) => a - b)[Math.floor(forgetTimes.length / 2)] ?? 0, forgetMsMax: Math.max(0, ...forgetTimes) },
     langsmith: { uploaded: upload, experiment: res.experimentName, url, dataset: upload ? name : undefined },
     sentence: upload ? sentence : `${sentence} (local run)`,
   });

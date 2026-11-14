@@ -64,8 +64,8 @@ const killAt = (step: string) => {
 
 async function accept(s: S): Promise<Partial<S>> {
   const d = await db();
-  const taps = await d.collection(TAPS).find({ personId: s.personId }, { projection: { _id: 1 } }).toArray();
-  return { tapIds: taps.map((t) => String(t._id)), before: await recordsFor(s.personId), erased: null, verified: null, steps: ["accept"] };
+  const [taps, before] = await Promise.all([d.collection(TAPS).find({ personId: s.personId }, { projection: { _id: 1 } }).toArray(), recordsFor(s.personId)]);
+  return { tapIds: taps.map((t) => String(t._id)), before, erased: null, verified: null, steps: ["accept"] };
 }
 
 async function erase(s: S): Promise<Partial<S>> {
@@ -83,10 +83,13 @@ async function erase(s: S): Promise<Partial<S>> {
 async function verify(s: S): Promise<Partial<S>> {
   killAt("verify");
   const d = await db();
-  const recordsLeft = await recordsFor(s.personId);
   const ids = (s.tapIds ?? []).filter((x) => ObjectId.isValid(x)).map((x) => new ObjectId(x));
-  const derivedPointingAtTaps = ids.length ? await d.collection(DERIVED).countDocuments({ derivedFrom: { $in: ids } }) : 0;
-  const tombstone = (await d.collection(TOMBSTONES).countDocuments({ hmac: hmac(s.personId) })) > 0 || s.before === 0;
+  const [recordsLeft, derivedPointingAtTaps, tombs] = await Promise.all([
+    recordsFor(s.personId),
+    ids.length ? d.collection(DERIVED).countDocuments({ derivedFrom: { $in: ids } }) : Promise.resolve(0),
+    d.collection(TOMBSTONES).countDocuments({ hmac: hmac(s.personId) }),
+  ]);
+  const tombstone = tombs > 0 || s.before === 0;
   // The pick check needs the rooms as forget left them, so it only applies when erase ran in this process.
   const venues = s.erased?.receipt?.venues as { matchesWithoutYou: boolean }[] | undefined;
   const picksMatched = venues ? venues.every((v) => v.matchesWithoutYou) : null;
@@ -160,8 +163,11 @@ export async function runForgetGraph(personId: string) {
     const { graph } = await ready();
     // "sync": each step's checkpoint is in Atlas before the next step starts.
     const cfg = { configurable: { thread_id: threadId }, durability: "sync" as const };
+    const t0 = Date.now();
     const final = (await graph.invoke({ personId, steps: [] } as never, cfg)) as S;
-    return finish(threadId, final, false);
+    const r = await finish(threadId, final, false);
+    (r.durable as Record<string, unknown>).ms = Date.now() - t0;
+    return r;
   })();
   running.set(threadId, job);
   try {
