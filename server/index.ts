@@ -177,7 +177,7 @@ app.post("/api/volunteer", wrap(async (req) => {
   if (!guests.length) throw fail(409, "No guests checked in yet.");
   const pick = guests[Math.floor(Math.random() * guests.length)];
   // The phone recognises itself by a short tag of its own id; the id itself never goes out.
-  emit("volunteer", { venueId: v, tag: guestTag(String(pick.personId)), label: guestLabel(String(pick.personId)) });
+  emit("volunteer", { venueId: v, tag: guestTag(String(pick.personId)) });
   return { label: guestLabel(String(pick.personId)) };
 }));
 // Point the QR codes at a public URL (e.g. a tunnel) without a restart. Local screen only (see the lock).

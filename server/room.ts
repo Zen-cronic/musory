@@ -991,8 +991,9 @@ async function forgetInner(personId: string) {
   for (const v of VENUE_IDS) void scheduleRefresh(v, 0);
   await d.collection(TOMBSTONES).updateOne({ hmac: hmac(personId) }, { $set: { venues: venues.map((v) => ({ venueId: v.venueId, matchesWithoutYou: v.matchesWithoutYou })) } });
   emit("txn", { op: "forget_me", counts: { ...before.counts, total: before.total, after: after.total }, graph, ms: txnMs });
-  emit("forgotten", { label: guestLabel(personId), ...receipt });
-  return receipt;
+  // Screens get counts and tracks only; the guest's own label goes back only to the guest's phone.
+  emit("forgotten", receipt);
+  return { ...receipt, label: guestLabel(personId) };
 }
 
 // What a guest sees about themselves

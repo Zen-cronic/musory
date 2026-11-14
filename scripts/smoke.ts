@@ -24,6 +24,28 @@ for (let i = 0; i < 60; i++) {
   if (h?.ready) break;
   await sleep(500);
 }
+// Listen to the screens' event stream: nothing on it may name a guest.
+const streamed: { type: string; data: any }[] = [];
+const ac = new AbortController();
+void (async () => {
+  const r = await fetch(BASE + "/events", { signal: ac.signal });
+  const reader = r.body!.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read().catch(() => ({ value: undefined, done: true }));
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, i);
+      buf = buf.slice(i + 2);
+      const type = /^event: (\S+)/m.exec(chunk)?.[1];
+      const data = /^data: (.*)$/m.exec(chunk)?.[1];
+      if (type && data) streamed.push({ type, data: JSON.parse(data) });
+    }
+  }
+})();
 await api("/api/film/reset", {});
 const guest = `smoke-${Date.now() % 1_000_000}`;
 
@@ -94,6 +116,11 @@ for (const v of ["copper", "basement"]) {
   const preview = (w.venues ?? []).find((x: any) => x.venueId === v)?.withoutYou?.trackId;
   check(`${v}: now playing the pick without them`, Boolean(now && now === promised), `${now} vs ${promised}; preview ${preview}`);
 }
+await sleep(800);
+const fe = streamed.filter((e) => e.type === "forgotten");
+check("the screens' forget-me event carries no guest label or id", fe.length > 0 && fe.every((e) => !("label" in e.data) && !("personId" in e.data) && !JSON.stringify(e.data).includes(guest)));
+check("no event on the screens' stream carries this guest's id", !streamed.some((e) => JSON.stringify(e.data).includes(guest)), `${streamed.length} events`);
+ac.abort();
 const n = await api("/api/number");
 check("the headline number recomputes with 0 records left", n.recordsLeftForForgottenGuests === 0 && n.forgotten >= 1, n.sentence);
 
