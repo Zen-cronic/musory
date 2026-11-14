@@ -39,7 +39,7 @@ const State = Annotation.Root({
   clipIds: Annotation<string[]>(),
   tombHmac: Annotation<string>(), // the keyed hash the tombstone already carries, never the id itself
   before: Annotation<number>(),
-  erased: Annotation<{ ran: boolean; skipped?: string; receipt?: Record<string, any>; forgetMs?: number } | null>(),
+  erased: Annotation<{ ran: boolean; skipped?: string; receipt?: Record<string, any>; forgetMs?: number; forgetStartedAt?: number } | null>(),
   verified: Annotation<{ ok: boolean; recordsLeft: number; derivedPointingAtTaps: number; clipsComposedFromYou: number; clipsLeft: number; tombstone: boolean; picksMatched: boolean | null } | null>(),
   steps: Annotation<string[]>({ reducer: (a, b) => a.concat(b), default: () => [] }),
 });
@@ -94,7 +94,7 @@ async function erase(s: S): Promise<Partial<S>> {
     const t0 = Date.now();
     const receipt = (await forget(s.personId)) as Record<string, any>;
     killAt("erase-committed"); // the delete is committed but this step's checkpoint is not
-    return { erased: { ran: true, receipt, forgetMs: Date.now() - t0 }, steps: ["erase"] };
+    return { erased: { ran: true, receipt, forgetMs: Date.now() - t0, forgetStartedAt: t0 }, steps: ["erase"] };
   }
   // Nothing left: either an earlier attempt committed the delete before a restart, or there was nothing.
   const d = await db();
@@ -200,7 +200,12 @@ export async function runForgetGraph(personId: string) {
     const r = await finish(threadId, final, false);
     const ms = Date.now() - t0;
     // What the durable job adds on top of the room's own forget (checkpoints, verify, cleanup).
-    Object.assign(r.durable as Record<string, unknown>, { ms, overheadMs: final.erased?.forgetMs != null ? ms - final.erased.forgetMs : null });
+    // beforeRoomMs: checkpoints and snapshot ahead of the room's forget (delays the audible change);
+    // afterRoomMs: verify and cleanup after it (delays only the receipt).
+    const e = final.erased;
+    const beforeRoomMs = e?.forgetStartedAt != null ? e.forgetStartedAt - t0 : null;
+    const overheadMs = e?.forgetMs != null ? ms - e.forgetMs : null;
+    Object.assign(r.durable as Record<string, unknown>, { ms, overheadMs, beforeRoomMs, afterRoomMs: overheadMs != null && beforeRoomMs != null ? overheadMs - beforeRoomMs : null });
     return r;
   })();
   running.set(threadId, job);
