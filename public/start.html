@@ -10,6 +10,7 @@
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .hero h1 { font-size: calc(clamp(40px, 6vw, 76px) * var(--dscale)); margin: 10px 0 14px; }
   .hero p { font-size: 20px; color: var(--on-bg-muted); max-width: 40em; }
+  .hero p.strong { color: var(--on-bg); font-weight: 800; font-size: 26px; }
   #number { margin-top: 12px; font-size: 15px; color: var(--on-bg-muted); }
   #number:empty { display: none; }
   .venues { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -32,8 +33,8 @@
 <main class="start">
   <header class="top"><a class="wordmark" href="/">Musory</a><a class="btn small" href="/how">How it works, live</a></header>
   <section class="hero">
-    <h1 class="display">The room plays what you like. Forget me undoes it.</h1>
-    <p>Tap what you like and the venue's music follows. One tap deletes your likes and the music made from them.</p>
+    <h1 class="display">Your bar learns what its crowd likes and makes music for it.</h1>
+    <p class="strong">One tap makes every venue forget you.</p>
     <p id="number"></p>
   </section>
   <section class="venues">

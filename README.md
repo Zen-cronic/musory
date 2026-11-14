@@ -1,12 +1,26 @@
 # Musory
 
-**After "forget me", 0 records about the guest are left at either venue, and each room plays exactly the track it said it would play without them.** `GET /api/number` recomputes this live, and `pnpm smoke` checks it end to end.
+**Toronto nightlife is shrinking: one venue's busy weekend nights bring in close to half what they did in 2019** ([CBC](https://www.cbc.ca/radio/costofliving/canada-nightlife-decline-9.6993902)).
 
-Tap what you like. The room plays it next. Say forget me, and every venue forgets you.
+**Your bar learns what its crowd likes and makes music for it. One tap makes every venue forget you.**
 
-Your taps feed every room's crowd memory, which you never wrote. Forget me removes your share everywhere, and each room plays exactly what it said it would play without you.
+Bars and clubs play one playlist for everyone. I love electronic music. Not everyone does.
 
-![Architecture](docs/architecture.png)
+## What a guest does
+
+1. Scan the venue's QR code and choose what to share.
+2. Tap **I like this** on what's playing. The room picks its next track from the people there.
+3. When the crowd's likes shift, ElevenLabs Music makes a new track for them and the room crossfades into it.
+
+## What forget me does
+
+One tap deletes your likes, your taste and any track made from them, at every venue, in one transaction.
+Afterwards 0 records about you are left, and each room plays the track it said it would play without you. `GET /api/number` recomputes this live, and `pnpm smoke` checks it end to end.
+
+![How Musory works: the guest's phone, the server, MongoDB Atlas and the room screens](docs/architecture.png)
+
+- **Watch the 1-minute video:** [VIDEO URL]
+- **Try it:** the live room runs from the team's laptop during the event. Watch the 1-minute video to see it.
 
 ## What it does
 
@@ -114,6 +128,10 @@ pnpm smoke                # end-to-end checks against the running server
 - Rockbot already remembers guests' favourite songs across its venues, and TouchTunes and Rockbot let guests vote on what plays. Carrying taste between venues is not new; consent per venue, private crowd memory and forget-me across every venue are what this adds.
 - Spotify's "exclude from your taste profile" and Taste Profile controls change recommendations "within 48 hours" or "a few hours", for one listener.
 - Taste APIs such as Qloo model taste across domains; Musory keeps taste with the person and lets them take it back.
+
+## What's next
+
+**Personal mode.** Your phone plays a version made for your own taste, in your earbuds, while the room plays the crowd's mix. It follows the same rules: it counts only while you're checked in, and forget me deletes it everywhere.
 
 ## License
 
