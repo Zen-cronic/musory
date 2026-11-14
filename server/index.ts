@@ -100,6 +100,7 @@ app.get("/me", page("phone.html"));
 app.get("/join", page("phone.html"));
 app.get("/p/:guest", page("phone.html"));
 app.get("/proof", page("proof.html"));
+app.get("/about", page("landing.html"));
 // Pages the visual layer adds (stage mode, how it works): 404 until the file exists.
 // /stage falls back to the room screen (Copper Room, with the Simulated guests button) until stage.html lands.
 for (const name of ["stage", "how"])

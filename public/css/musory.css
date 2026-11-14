@@ -83,6 +83,7 @@ a { color: inherit; }
 /* Buttons */
 .btn { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 0 22px; border-radius: var(--btn-radius); border: var(--rule) solid currentColor; background: transparent; font-weight: 800; font-size: var(--s-4); transition: transform var(--t-fast) var(--ease), background var(--t-base) var(--ease); }
 .btn:active { transform: translateY(1px); }
+a.btn { text-decoration: none; }
 .btn.primary { background: var(--on-bg); color: var(--bg); border-color: var(--on-bg); }
 .surface .btn.primary, .ticket .btn.primary { background: var(--text); color: var(--surface); border-color: var(--text); }
 .btn.forget { background: var(--band-bg, var(--band)); border-color: transparent; color: var(--on-band); }

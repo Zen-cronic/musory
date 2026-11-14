@@ -5,30 +5,55 @@
 <title>Start here, Musory</title>
 <script src="/js/look-early.js"></script>
 <link rel="stylesheet" href="/css/musory.css">
-<style> body { padding: 24px; max-width: 1100px; margin: 0 auto; } .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; } img { width: 160px; background: #fff; display: block; margin: 8px 0; } ol li { margin: 8px 0; } </style>
+<style>
+  .start { max-width: 1120px; margin: 0 auto; padding: 20px 24px 40px; display: grid; gap: 28px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .hero h1 { font-size: calc(clamp(40px, 6vw, 76px) * var(--dscale)); margin: 10px 0 14px; }
+  .hero p { font-size: 20px; color: var(--on-bg-muted); max-width: 40em; }
+  #number { margin-top: 12px; font-size: 15px; color: var(--on-bg-muted); }
+  #number:empty { display: none; }
+  .venues { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .venue { padding: 22px; display: grid; grid-template-columns: 170px 1fr; gap: 20px; align-items: center; }
+  .venue img { width: 170px; height: 170px; background: #fff; display: block; }
+  .venue h2 { font-size: calc(36px * var(--dscale)); margin-bottom: 14px; }
+  .venue .btn { display: inline-flex; }
+  .venue .more { margin-top: 12px; font-size: 14px; color: var(--muted); }
+  .venue .more a { color: var(--text); font-weight: 700; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .step { padding: 16px 18px; display: grid; gap: 6px; }
+  .step .n { font-family: var(--f-display); font-weight: 900; font-stretch: 75%; font-size: 40px; line-height: .8; color: var(--band); }
+  .step b { font-size: 19px; }
+  .step span { font-size: 15px; color: var(--muted); }
+  .foot { display: flex; flex-wrap: wrap; gap: 10px; }
+  @media (max-width: 800px) { .venues, .steps { grid-template-columns: 1fr; } .venue { grid-template-columns: 120px 1fr; } .venue img { width: 120px; height: 120px; } }
+</style>
 </head>
-<body class="legacy">
-<div class="label">Musory</div>
-<h1 class="big" style="font-size:52px;margin:6px 0">Tap what you like. The room plays it next.</h1>
-<p style="font-size:20px;max-width:760px">Your taste goes with you to any venue that asks first. Each venue's crowd memory stays private. Say <b>forget me</b>, and every venue forgets you, in one transaction.</p>
-<div id="number" class="card mono" style="margin:16px 0">…</div>
-<h2>Start here</h2>
-<ol>
-  <li>Open <a href="/room/copper">Copper Room</a> and <a href="/room/basement">Basement 2</a> on the laptop. Press <b>Start the room</b> on one of them for sound.</li>
-  <li>Scan Copper Room's QR code with your phone (or open <a href="/join/copper">the guest page</a> here). Check in, then tap <b>I like this</b> a few times.</li>
-  <li>Watch <b>Next</b> change on the room screen. It shows the pick with memory next to the pick with no memory.</li>
-  <li>Tap <b>Go to Basement 2</b> on your phone. Your taste applies there at once.</li>
-  <li>Tap <b>Forget me</b>. The receipt shows the records about you going to 0, and both rooms re-pick.</li>
-  <li>Watch <a href="/how">how it works, live</a>. On <a href="/proof">the database rules page</a>, run the database refusals: 13, 121 and E11000.</li>
-</ol>
-<div class="cols">
-  <div class="card"><div class="label">Copper Room</div><img src="/api/qr?venue=copper" alt="QR code for Copper Room"><div><a href="/room/copper">Room screen</a>, <a href="/join/copper">guest page</a>, <a href="/stage?venue=copper">stage screen</a></div></div>
-  <div class="card"><div class="label">Basement 2</div><img src="/api/qr?venue=basement" alt="QR code for Basement 2"><div><a href="/room/basement">Room screen</a>, <a href="/join/basement">guest page</a>, <a href="/stage?venue=basement">stage screen</a></div></div>
-</div>
+<body>
+<main class="start">
+  <header class="top"><a class="wordmark" href="/">Musory</a><a class="btn small" href="/how">How it works, live</a></header>
+  <section class="hero">
+    <h1 class="display">Tap forget me once and every venue's music stops using your taste.</h1>
+    <p>Music changes how long guests stay. Musory plays what a venue's regulars liked, pooled in anonymous groups of 3 or more, and forgets any guest in one tap.</p>
+    <p id="number"></p>
+  </section>
+  <section class="venues">
+    <div class="surface venue"><img src="/api/qr?venue=copper" alt="QR code to check in at Copper Room"><div><h2 class="display">Copper Room</h2><a class="btn forget" href="/room/copper">Open room screen</a><p class="more">Or open the <a href="/join/copper">guest page</a> or the <a href="/stage?venue=copper">stage screen</a>.</p></div></div>
+    <div class="surface venue"><img src="/api/qr?venue=basement" alt="QR code to check in at Basement 2"><div><h2 class="display">Basement 2</h2><a class="btn forget" href="/room/basement">Open room screen</a><p class="more">Or open the <a href="/join/basement">guest page</a> or the <a href="/stage?venue=basement">stage screen</a>.</p></div></div>
+  </section>
+  <section class="steps" aria-label="How to run the demo">
+    <div class="surface step"><span class="n">1</span><b>Open a room</b><span>Press Start the room for sound.</span></div>
+    <div class="surface step"><span class="n">2</span><b>Scan and like</b><span>Check in on your phone, tap I like this, then Switch to Basement 2.</span></div>
+    <div class="surface step"><span class="n">3</span><b>Forget me</b><span>The records about you go to 0 and both rooms pick again without you.</span></div>
+  </section>
+  <nav class="foot"><a class="btn small" href="/how">How it works, live</a><a class="btn small" href="/proof">What the database refuses</a><a class="btn small" href="/about">About Musory</a></nav>
+</main>
 <script type="module">
 import { api, $ } from "/js/common.js";
-const n = await api("/api/number");
-$("number").textContent = n.sentence;
+const n = await api("/api/number").catch(() => null);
+const bits = [];
+if (n?.picksChangedByMemory) bits.push(`Tonight the people here changed ${n.picksChangedByMemory} of ${n.picks} picks.`);
+if (n?.forgotten) bits.push(`${n.forgotten} ${n.forgotten === 1 ? "guest" : "guests"} said forget me, and ${n.recordsLeftForForgottenGuests ? n.recordsLeftForForgottenGuests + " records" : "no records"} about them are left.`);
+$("number").textContent = bits.join(" ");
 </script>
 </body>
 </html>
