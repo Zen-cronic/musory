@@ -28,6 +28,7 @@
   .now .g { color: var(--slab-muted); font-weight: 600; font-size: 15px; }
   .btn.like { min-height: 72px; font-size: 24px; }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .two:has(#undo.hidden) #skip { grid-column: 1 / -1; }
   .two .btn { flex-direction: column; gap: 2px; min-height: 72px; font-size: 18px; line-height: 1.1; padding: 8px 10px; }
   .card { padding: 14px 16px; gap: 10px; }
   .card h2 { font-size: calc(24px * var(--dscale)); }

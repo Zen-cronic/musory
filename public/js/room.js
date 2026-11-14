@@ -87,14 +87,16 @@ function showPlay(play, { instant = false } = {}) {
   const slab = $("now-playing");
   const t = $("now-title");
   const apply = () => {
-    t.textContent = play.title;
-    t.classList.toggle("long", play.title.length > 14);
+    // A track made just now is named after the room, which the header already says: name its sound instead.
+    const shown = play.composed && /^made for/i.test(play.title) ? `New ${genreName(play.genre).toLowerCase()} track` : play.title;
+    t.textContent = shown;
+    t.classList.toggle("long", shown.length > 14);
     t.dataset.trackId = play.trackId;
     slab.dataset.trackId = play.trackId;
     $("now-meta").innerHTML = `<span class="chip solid">${genreName(play.genre)}</span><span class="chip">${play.bpm} BPM</span>${play.composed ? `<span class="chip made">Made just now for this room</span>` : ""}`;
     $("now-provenance").textContent = play.provenance || "";
     t.dataset.audio = play.audio;
-    $("now-desc").textContent = (play.descriptor || "").replace(/\s*\|\s*/g, ". ").replace(/&/g, "and");
+    $("now-desc").textContent = play.composed ? "" : (play.descriptor || "").split("|")[0].replace(/&/g, "and").split(/,\s*/).filter((x, i, a) => a.indexOf(x) === i).slice(0, 6).join(", ");
     const why = $("now-why");
     why.textContent = !film && play.memoryChangedPick && play.baselinePick ? `Picked from the room's memory. Without memory it would be ${play.baselinePick.title}.` : "";
     why.hidden = !why.textContent;

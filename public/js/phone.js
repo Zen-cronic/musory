@@ -46,7 +46,7 @@ function render(m) {
   bars($("taste"), m.taste?.weights);
   $("taste-version").textContent = m.taste ? `From ${m.taste.likes} ${m.taste.likes === 1 ? "like" : "likes"}` : "";
   const other = here === "copper" ? "basement" : "copper";
-  $("switch-venue").textContent = `Check in at ${venueName(other)} instead`;
+  $("switch-venue").textContent = `Switch to ${venueName(other)}`;
   $("switch-venue").dataset.testid = `checkin-venue-${other}`;
   $("carry").textContent = m.taste ? `Your taste goes with you. It counts at ${m.venue ?? "a venue"} only while you're checked in.` : "Tap \"I like this\" to start your taste.";
   $("tonight-state").textContent = m.tonight ? `Tonight only is on at ${venueName(m.tonight.venueId)} until ${new Date(m.tonight.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Tonight's likes stay out of your long-term taste unless you keep one.` : "";

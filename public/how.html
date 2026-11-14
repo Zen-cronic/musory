@@ -57,7 +57,7 @@
   <header class="head">
     <a class="wordmark" href="/">Musory</a>
     <h1 class="display">How it works, live</h1>
-    <p>Each box lights up when the real operation runs.</p>
+    <p>Each box lights up when the real operation&nbsp;runs.</p>
   </header>
 
   <section class="flow" aria-label="From a tap to the next track">
@@ -86,7 +86,11 @@
     </div>
     <div class="lane">
       <header><span class="kicker on-bg">Rules the database enforces</span></header>
-      <div class="refusals" id="refusals" data-testid="viz-refusals"><p class="empty" style="color:var(--on-bg-muted)">No refusals yet. They appear here the moment the database says no.</p></div>
+      <div class="refusals" id="refusals" data-testid="viz-refusals">
+        <div class="refusal empty"><span class="code">121</span><span class="what">Breaks a memory rule</span><span class="why">Crowd memory needs 3 people. Tonight-only likes stay out of your taste.</span></div>
+        <div class="refusal empty"><span class="code">13</span><span class="what">Not allowed to read</span><span class="why">Each venue's login reads only its own crowd memory.</span></div>
+        <div class="refusal empty"><span class="code">11000</span><span class="what">Already counted</span><span class="why">One like per guest per track.</span></div>
+      </div>
       <div class="surface card">
         <h3 id="cs-title">Change stream</h3>
         <p class="plain" id="cs-plain">Atlas pushes every saved change to the room screens. No polling.</p>
@@ -120,8 +124,9 @@ function vectorSearch(e) {
   $("vs-title").textContent = `Vector search: the next track for ${names[e.venueId] || "the room"}`;
   $("vs-plain").textContent = people ? `Searched with the blended taste of ${people} ${people === 1 ? "person" : "people"} here, at tonight's energy. Closer to 1 means a closer match.` : `No one here shares their taste yet, so it searched with the venue's crowd memory. Closer to 1 means a closer match.`;
   const top = (e.topK || []).slice(0, 5);
-  const max = Math.max(...top.map((t) => t.score), 1);
-  $("vs-matches").innerHTML = top.map((t, i) => `<div class="m${i === 0 ? " win" : ""}"><span>${t.title}, ${genreName(t.genre).toLowerCase()}</span><span class="track"><i style="width:${Math.round((t.score / max) * 100)}%"></i></span><span class="s">${t.score.toFixed(2)}</span></div>`).join("");
+  const hi = Math.max(...top.map((t) => t.score)), lo = Math.min(...top.map((t) => t.score));
+  const w = (sc) => Math.round(35 + 65 * (hi > lo ? (sc - lo) / (hi - lo) : 1));
+  $("vs-matches").innerHTML = top.map((t, i) => `<div class="m${i === 0 ? " win" : ""}"><span>${t.title}, ${genreName(t.genre).toLowerCase()}</span><span class="track"><i style="width:${w(t.score)}%"></i></span><span class="s">${t.score.toFixed(2)}</span></div>`).join("");
 }
 const changeWords = (e) => {
   if (e.coll === "taps") return [`A like in ${names[e.venueId] || "a venue"}`, "Atlas pushed the change. The room screen updated without asking."];
@@ -140,7 +145,7 @@ function change(e) {
 }
 function refusal(e) {
   const box = $("refusals");
-  box.querySelector(".empty")?.remove();
+  box.querySelectorAll(".empty").forEach((x) => x.remove());
   box.insertAdjacentHTML("afterbegin", refusalTicket(e));
   while (box.children.length > 3) box.lastElementChild.remove();
 }
