@@ -93,6 +93,7 @@ async function erase(s: S): Promise<Partial<S>> {
   killAt("erase");
   if ((await recordsFor(s.personId)) > 0) {
     const receipt = (await forget(s.personId)) as Record<string, any>;
+    killAt("erase-committed"); // the delete is committed but this step's checkpoint is not
     return { erased: { ran: true, receipt }, steps: ["erase"] };
   }
   // Nothing left: either an earlier attempt committed the delete before a restart, or there was nothing.

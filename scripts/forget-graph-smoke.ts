@@ -71,14 +71,14 @@ const check = (name: string, ok: boolean, detail: unknown) => {
   console.log(`${ok ? "PASS" : "FAIL"} ${name} ${JSON.stringify(detail)}`);
 };
 
-async function variant(killAt: "erase" | "verify") {
+async function variant(killAt: "erase" | "erase-committed" | "verify") {
   const personId = `fgsmoke-${Date.now().toString(36)}-${killAt}`;
   await api("POST", "/api/checkin", { personId, venueId: "copper", scopes: ["use_taste", "contribute_crowd"] });
   for (const trackId of ["t13", "t15"]) await api("POST", "/api/tap", { personId, signal: 1, trackId });
   await new Promise((r) => setTimeout(r, 2500));
   const before = await records(personId);
   const a = spawn(["--child", "run", personId], { FORGET_GRAPH_KILL_AT: killAt });
-  const afterKill = { exit: a.code, records: await records(personId) - (await checkpoints(personId) > 0 ? 0 : 0), checkpoints: await checkpoints(personId), tombstones: await tombstones(personId) };
+  const afterKill = { exit: a.code, documentsWithId: await records(personId), checkpoints: await checkpoints(personId), tombstones: await tombstones(personId) };
   check(`killed at ${killAt}: process exited 137 with the request checkpointed`, a.code === 137 && afterKill.checkpoints > 0, { ...afterKill, before, stderr: a.err });
   const b = spawn(["--child", "resume"]);
   const mine = (b.result ?? []).find((x: any) => x?.durable) as any;
@@ -88,7 +88,11 @@ async function variant(killAt: "erase" | "verify") {
   const tombs = await tombstones(personId);
   check(`resumed after kill at ${killAt}`, b.code === 0 && Boolean(job?.durable?.resumed), { exit: b.code, resumedAfter: job?.resumedAfter, steps: job?.durable?.steps, erase: job?.durable?.erase, stderr: b.code ? b.err : undefined });
   check("each step ran once", JSON.stringify(job?.durable?.steps) === JSON.stringify(["accept", "erase", "verify"]), job?.durable?.steps);
-  check(killAt === "erase" ? "the delete happened after the restart" : "the delete was not repeated", killAt === "erase" ? job?.durable?.erase === "ran" : job?.durable?.erase === "already erased before a restart", job?.durable?.erase);
+  // erase: killed before the delete, so the resumed job deletes. erase-committed: killed after the delete
+  // committed but before its checkpoint, so the resumed job re-enters erase and must find nothing to do.
+  // verify: the erase step's checkpoint exists, so the resumed job doesn't re-enter erase at all.
+  const wantErase = killAt === "erase-committed" ? "already erased before a restart" : "ran";
+  check(`erase after the restart: ${wantErase}`, job?.durable?.erase === wantErase, job?.durable?.erase);
   check("verified: 0 records, nothing derived points at the taps, tombstone", job?.durable?.verified === true, { recordsLeft: job?.durable?.recordsLeft, derived: job?.durable?.derivedPointingAtYourTaps });
   check("one tombstone", tombs === 1, tombs);
   check("no copy of the guest id in any collection, checkpoints included", left === 0, { documentsWithId: left, checkpointsLeft: job?.durable?.checkpointsLeft });
@@ -103,6 +107,7 @@ else {
   await api("GET", "/api/health");
   await variant("verify");
   await variant("erase");
+  await variant("erase-committed");
   console.log(failures ? `${failures} check(s) failed` : "forget graph smoke: all checks passed");
   await closeAll();
   process.exit(failures ? 1 : 0);
