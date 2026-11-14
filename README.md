@@ -30,6 +30,10 @@ Toronto nightlife is shrinking ([CBC](https://www.cbc.ca/radio/costofliving/cana
 - **How do you fix or drop a memory that's wrong or expired?** Skip it, or "Play something different" to set old likes aside (with Undo). "Only count my likes tonight" expires with Atlas TTL, and tracks made for the room expire after closing. Forget me deletes your likes, taste and the tracks made from them in one transaction, and rebuilds crowd memory without you.
 - **How do you prove memory changed behaviour?** Every pick is saved next to the pick the same search makes with no memory, and the room shows both. No language model picks tracks. In our scripted test, memory changed the pick in 8 of 9 scenarios, and a guest who didn't consent changed nothing.
 
+## Built during the hackathon
+
+Musory was built on November 14, 2026 at Agents in Context Toronto. Every commit in this repository is from that day (the first at 13:52 EST), so the commit history shows exactly what was made during the event. Open-source libraries are listed in `package.json`. The music is generated with ElevenLabs Music, and the track embeddings with Voyage AI.
+
 ## Screens
 
 | | |
