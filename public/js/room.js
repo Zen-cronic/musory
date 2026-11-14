@@ -228,7 +228,7 @@ function startMaking(e) {
   const d = e.descriptors || {};
   const what = [d.genres?.length ? d.genres.map(genreName).join(" and ") : e.genre && genreName(e.genre), (d.bpm || e.bpm) && `${d.bpm || e.bpm} BPM`].filter(Boolean).join(", ");
   const people = e.people ?? e.present;
-  $("making-for").textContent = e.text ? e.text.replace(/…$/, "") : `For ${people ? `the ${people} ${people === 1 ? "person" : "people"} here` : "the people here"}${what ? `: ${what}` : ""}`;
+  $("making-for").textContent = e.text ? e.text.replace(/…$/, "").replace(/^Making a new track\s*/i, "").replace(/^./, (c) => c.toUpperCase()) : `For ${people ? `the ${people} ${people === 1 ? "person" : "people"} here` : "the people here"}${what ? `: ${what}` : ""}`;
   $("making-now").textContent = current?.title || "";
   busy(true);
   settle();
