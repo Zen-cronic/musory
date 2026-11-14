@@ -80,7 +80,7 @@
         <h3>Forget me: one transaction</h3>
         <div class="facts">
           <div class="fact"><span class="figure" id="fg-records">0</span><span>records about the last guest who said forget me</span></div>
-          <div class="fact"><span class="figure" id="fg-copies">0</span><span>copies built from their likes, found and removed</span></div>
+          <div class="fact"><span class="figure" id="fg-copies">0</span><span>records built from their likes, found by following links and removed</span></div>
         </div>
       </div>
     </div>
@@ -154,7 +154,7 @@ function txn(e) {
   const c = e.counts || {};
   $("fg-records").innerHTML = `${c.total ?? 0}<span class="count-arrow"></span>${c.after ?? 0}`;
   const g = e.graph || {};
-  const found = g.found ?? g.count ?? g.derived ?? (Array.isArray(g.ids) ? g.ids.length : null);
+  const found = g.depth0 != null ? (g.depth0 || 0) + (g.depth1 || 0) : (g.found ?? g.count ?? null);
   $("fg-copies").innerHTML = found != null ? `${found}<span class="count-arrow"></span>0` : "0";
   light("n-change");
 }
