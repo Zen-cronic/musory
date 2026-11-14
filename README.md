@@ -19,7 +19,7 @@ Afterwards the checked collections hold 0 records with your guest id, and the ro
 
 ![How Musory works: the guest's phone, the server, MongoDB Atlas and the room screens](docs/architecture.png)
 
-- **Watch the 1-minute video:** [VIDEO URL]
+- **Watch the 1-minute video:** https://youtu.be/Q6TSA8ha3UM
 - **Try it:** watch the 1-minute video to see it.
 
 Toronto nightlife is shrinking ([CBC](https://www.cbc.ca/radio/costofliving/canada-nightlife-decline-9.6993902)), so venues need guests to come back. This is a prototype with simulated venues. A venue pilot would test whether guests prefer its choices.
