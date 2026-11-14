@@ -11,10 +11,10 @@
   .qr { padding: 3vh; display: grid; gap: 2vh; align-content: start; }
   .qr img { width: 100%; aspect-ratio: 1; background: #fff; display: block; }
   .qr p { font-family: var(--f-display); font-weight: 900; font-stretch: var(--stretch); text-transform: var(--case); font-size: 5vh; line-height: .95; }
-  .right { display: grid; grid-template-rows: auto 1fr auto; gap: 3vh; min-width: 0; }
+  .right { display: grid; grid-template-rows: auto auto 1fr auto; gap: 3vh; min-width: 0; }
   .right .top { display: flex; align-items: center; justify-content: space-between; gap: 2vh; }
   .count { display: flex; flex-direction: column; justify-content: center; }
-  .count .n { font-size: 32vh; }
+  .count .n { font-size: 28vh; }
   .count .l { font-family: var(--f-display); font-weight: 900; font-stretch: var(--stretch); text-transform: var(--case); font-size: 6.4vh; line-height: .95; }
   .now { padding: 2.6vh 3vh; display: grid; gap: 1vh; }
   .now .t { font-size: 8vh; }
@@ -28,8 +28,10 @@
   .receipt h1 { font-size: 12vh; max-width: 16ch; }
   .receipt .figure { font-size: 30vh; justify-self: start; }
   .receipt p { font-weight: 800; font-size: 4.4vh; max-width: 30ch; line-height: 1.15; }
-  .sim { position: fixed; right: 3vh; top: 3vh; z-index: 20; display: flex; gap: 10px; align-items: center; }
-  .sim .btn.go { min-height: 64px; font-size: 22px; padding: 0 28px; }
+  .sim { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .sim .btn { min-height: 44px; font-size: 16px; padding: 0 16px; }
+  .sim .reset { margin-left: auto; }
+  .sim .btn.go { min-height: 52px; font-size: 19px; padding: 0 22px; }
   .sim .reset { min-height: 30px; font-size: 12px; padding: 0 10px; opacity: .55; }
   .sim .reset:hover, .sim .reset:focus-visible { opacity: 1; }
   .right .top { padding-right: 330px; }
@@ -43,13 +45,13 @@
   </section>
   <section class="right">
     <div class="top"><span class="wordmark lg">Musory</span><h2 class="display" id="venue-name" style="font-size:5vh"></h2></div>
+    <div class="sim controls"><button id="simulate" class="btn forget go">Simulated guests: 5 tap a new sound</button><button id="audience" class="btn" aria-pressed="false">Audience mode: off</button><button id="their-turn" class="btn" hidden>Their turn: next typed vibe makes a track</button><button id="reset" class="btn reset" title="Reset both rooms">Reset</button></div>
     <div class="count"><span class="figure n" id="present" data-testid="stage-count">0</span><span class="l">people shaping the music</span></div>
     <div class="slab now" data-testid="now-playing" id="now-playing" data-track-id=""><span class="kicker">Now playing</span><span class="display t" id="now-title"></span><span class="g" id="now-meta"></span></div>
   </section>
   <div id="ticker" hidden></div>
 </main>
 <section class="flood receipt hidden" id="receipt" data-testid="stage-receipt"></section>
-<div class="sim controls"><button id="reset" class="btn reset" title="Reset both rooms">Reset</button><button id="simulate" class="btn forget go">Simulated guests: 5 tap a new sound</button><button id="audience" class="btn" aria-pressed="false">Audience mode: off</button><button id="their-turn" class="btn" hidden>Their turn: next typed vibe makes a track</button></div>
 <script type="module">
 import { api, events, $, genreName } from "/js/common.js";
 import { params, busy, settle, film } from "/js/look.js";
