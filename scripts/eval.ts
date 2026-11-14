@@ -103,13 +103,13 @@ async function scanFor(personId: string) {
   const d = await db();
   const hits: Record<string, number> = {};
   let scanned = 0;
-  for (const c of await d.listCollections({ type: "collection" }, { nameOnly: true }).toArray()) {
-    if (c.name.startsWith("system.")) continue;
-    for (const doc of await d.collection(c.name).find({}).toArray()) {
+  const names = (await d.listCollections({ type: "collection" }, { nameOnly: true }).toArray()).map((c) => c.name).filter((n) => !n.startsWith("system."));
+  const all = await Promise.all(names.map(async (n) => [n, await d.collection(n).find({}).toArray()] as const));
+  for (const [n, docs] of all)
+    for (const doc of docs) {
       scanned++;
-      if (JSON.stringify(doc).includes(personId)) hits[c.name] = (hits[c.name] ?? 0) + 1;
+      if (JSON.stringify(doc).includes(personId)) hits[n] = (hits[n] ?? 0) + 1;
     }
-  }
   if (JSON.stringify(await api("GET", "/api/recent")).includes(personId)) hits["event feed"] = 1;
   return { scanned, hits };
 }
