@@ -11,28 +11,70 @@ let venueName = venue;
 const players = [$("audio-a"), $("audio-b")];
 let active = 0;
 
-const RING = `<svg class="mark ring draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M200 34 C 214 74, 160 106, 104 106 C 44 106, 4 86, 5 54 C 6 22, 56 3, 114 3 C 170 3, 214 16, 210 44"/></svg>`;
+const RING = `<svg class="mark ring draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M34 5 C 90 1, 160 1, 208 7 C 217 32, 217 78, 209 103 C 150 109, 70 109, 11 103 C 3 78, 3 32, 12 8 C 30 4, 52 3, 70 4"/></svg>`;
 const UNDER = `<svg class="mark under draw" viewBox="0 0 220 24" preserveAspectRatio="none" aria-hidden="true"><path d="M4 12 C 60 4, 140 3, 216 9 M 34 20 C 92 13, 150 14, 204 18"/></svg>`;
 const LEAF = `<span class="logo-chip"><img src="/img/mongodb-leaf.svg" alt="MongoDB"></span>`;
 const trackLine = (t) => (t ? `${genreName(t.genre)}${t.bpm ? `, ${t.bpm} BPM` : ""}` : "");
 
-function crossfade(src) {
+// Transitions: 1 s crossfade between catalogue tracks, 3 s with filter sweeps into or out of a track made
+// just now (low-pass sweep down on the outgoing track, high-pass sweep down on the incoming one).
+const SWEEP_MS = 3000;
+let ctx = null;
+const chains = players.map((el) => ({ el, filter: null, gain: null }));
+function ensureGraph() {
+  if (ctx) return;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+  if (film) {
+    // For filming: the room's audio after the filters, as a MediaStream.
+    const dest = ctx.createMediaStreamDestination();
+    master.connect(dest);
+    window.__roomStream = dest.stream;
+  }
+  for (const c of chains) {
+    const src = ctx.createMediaElementSource(c.el);
+    c.filter = ctx.createBiquadFilter();
+    c.filter.type = "lowpass";
+    c.filter.frequency.value = 22000;
+    c.gain = ctx.createGain();
+    c.gain.gain.value = 0;
+    src.connect(c.filter).connect(c.gain).connect(master);
+  }
+}
+function crossfade(src, sweep = false) {
   if (!started || !soundOn || !src) return;
-  const from = players[active];
-  const to = players[1 - active];
-  to.src = src;
-  to.volume = 0;
-  to.currentTime = 0;
-  to.play().catch(() => {});
-  const t0 = performance.now();
-  const step = () => {
-    const f = Math.min(1, (performance.now() - t0) / CROSSFADE_MS);
-    to.volume = f;
-    from.volume = 1 - f;
-    if (f < 1) requestAnimationFrame(step);
-    else from.pause();
-  };
-  step();
+  ensureGraph();
+  ctx.resume().catch(() => {});
+  const from = chains[active];
+  const to = chains[1 - active];
+  const dur = (sweep ? SWEEP_MS : CROSSFADE_MS) / 1000;
+  const t = ctx.currentTime;
+  to.el.src = src;
+  to.el.currentTime = 0;
+  to.el.play().catch(() => {});
+  to.gain.gain.cancelScheduledValues(t);
+  to.gain.gain.setValueAtTime(0, t);
+  to.gain.gain.linearRampToValueAtTime(1, t + dur);
+  from.gain.gain.cancelScheduledValues(t);
+  from.gain.gain.setValueAtTime(from.gain.gain.value, t);
+  from.gain.gain.linearRampToValueAtTime(0, t + dur);
+  for (const c of [from, to]) c.filter.frequency.cancelScheduledValues(t);
+  if (sweep) {
+    from.filter.type = "lowpass";
+    from.filter.frequency.setValueAtTime(18000, t);
+    from.filter.frequency.exponentialRampToValueAtTime(250, t + dur);
+    to.filter.type = "highpass";
+    to.filter.frequency.setValueAtTime(1500, t);
+    to.filter.frequency.exponentialRampToValueAtTime(20, t + dur);
+  } else {
+    from.filter.type = "lowpass";
+    from.filter.frequency.setValueAtTime(22000, t);
+    to.filter.type = "lowpass";
+    to.filter.frequency.setValueAtTime(22000, t);
+  }
+  const el = from.el;
+  setTimeout(() => el.pause(), dur * 1000 + 100);
   active = 1 - active;
 }
 
@@ -40,15 +82,19 @@ function crossfade(src) {
 function showPlay(play, { instant = false } = {}) {
   if (!play) return;
   const changed = !current || current.playId !== play.playId;
+  const sweep = Boolean(play.composed || current?.composed);
   current = play;
   const slab = $("now-playing");
   const t = $("now-title");
   const apply = () => {
     t.textContent = play.title;
+    t.classList.toggle("long", play.title.length > 14);
     t.dataset.trackId = play.trackId;
     slab.dataset.trackId = play.trackId;
-    $("now-meta").innerHTML = `<span class="chip solid">${genreName(play.genre)}</span><span class="chip">${play.bpm} BPM</span>${play.generated ? `<span class="chip solid made-chip">Made just now for this room</span>` : ""}`;
-    $("now-desc").textContent = play.descriptor || "";
+    $("now-meta").innerHTML = `<span class="chip solid">${genreName(play.genre)}</span><span class="chip">${play.bpm} BPM</span>${play.composed ? `<span class="chip made">Made just now for this room</span>` : ""}`;
+    $("now-provenance").textContent = play.provenance || "";
+    t.dataset.audio = play.audio;
+    $("now-desc").textContent = (play.descriptor || "").replace(/\s*\|\s*/g, ". ").replace(/&/g, "and");
     const why = $("now-why");
     why.textContent = !film && play.memoryChangedPick && play.baselinePick ? `Picked from the room's memory. Without memory it would be ${play.baselinePick.title}.` : "";
     why.hidden = !why.textContent;
@@ -56,11 +102,12 @@ function showPlay(play, { instant = false } = {}) {
   };
   if (!changed || instant) { apply(); settle(); return; }
   busy(true);
+  if (play.composed) endMaking();
   t.classList.add("out");
   setTimeout(() => { apply(); t.classList.remove("out"); }, 320);
-  crossfade(play.audio);
-  console.log("now-playing", JSON.stringify({ trackId: play.trackId, at: Date.now() }));
-  setTimeout(() => { busy(false); settle(); }, Math.max(CROSSFADE_MS, 640));
+  crossfade(play.audio, sweep);
+  console.log("now-playing", JSON.stringify({ trackId: play.trackId, audio: play.audio, composed: Boolean(play.composed), crossfadeMs: sweep ? SWEEP_MS : CROSSFADE_MS, at: Date.now() }));
+  setTimeout(() => { busy(false); settle(); }, Math.max(sweep ? SWEEP_MS : CROSSFADE_MS, 640));
 }
 
 // The plain-words reason for the next pick. No raw percentages on screen.
@@ -85,8 +132,7 @@ function showNext(d) {
   $("without-memory").dataset.trackId = b?.trackId || "";
   $("without-title").textContent = b ? b.title : "…";
   $("without-genre").textContent = trackLine(b);
-  // When both picks are the same track, the no-memory card adds nothing: hide it.
-  $("without-memory").hidden = Boolean(b && p && b.trackId === p.trackId);
+  $("without-memory-row").classList.toggle("hidden", !b || b.trackId === p?.trackId);
   const ring = $("with-memory").querySelector(".mark");
   if (ring) ring.remove();
   if (p && b && p.trackId !== b.trackId) $("with-memory").insertAdjacentHTML("beforeend", RING);
@@ -174,29 +220,32 @@ function showReceipt(r) {
   sameQuery(r.totalBefore, r.totalAfter, r.label);
 }
 
-// The room makes a new track: the visual peak. Shapes are tolerant until the event contract settles.
-function showMaking(e) {
+// The room makes a new track: the visual peak. Driven by music_making, music_gen and music_fallback.
+function startMaking(e) {
   const slab = $("now-playing");
-  const phase = e.phase || e.status || "start";
-  if (phase === "start" || phase === "making") {
-    slab.classList.add("is-making");
-    $("now-kicker").textContent = "Making the next track";
-    const people = e.people ?? e.presentCount ?? e.sharing;
-    const what = [e.genre && genreName(e.genre), e.bpm && `${e.bpm} BPM`].filter(Boolean).join(", ");
-    $("making-for").textContent = `For ${people ? `the ${people} ${people === 1 ? "person" : "people"} here` : "the people here"}${what ? `: ${what}` : ""}`;
-    $("making-now").textContent = current?.title || "";
-    busy(true);
-  } else {
-    slab.classList.remove("is-making");
-    $("now-kicker").textContent = "Now playing";
-    busy(false);
-    if (phase === "fallback") $("now-meta").insertAdjacentHTML("beforeend", `<span class="chip">Playing the closest track we have</span>`);
-  }
+  slab.classList.add("is-making");
+  $("now-kicker").textContent = "Making the next track";
+  const d = e.descriptors || {};
+  const what = [d.genres?.length ? d.genres.map(genreName).join(" and ") : e.genre && genreName(e.genre), (d.bpm || e.bpm) && `${d.bpm || e.bpm} BPM`].filter(Boolean).join(", ");
+  const people = e.people ?? e.present;
+  $("making-for").textContent = e.text ? e.text.replace(/…$/, "") : `For ${people ? `the ${people} ${people === 1 ? "person" : "people"} here` : "the people here"}${what ? `: ${what}` : ""}`;
+  $("making-now").textContent = current?.title || "";
+  busy(true);
+  settle();
+}
+function endMaking(note) {
+  const slab = $("now-playing");
+  if (!slab.classList.contains("is-making")) { if (note) $("making-for").textContent = note; return; }
+  slab.classList.remove("is-making");
+  $("now-kicker").textContent = "Now playing";
+  busy(false);
+  if (note) $("now-meta").insertAdjacentHTML("beforeend", `<span class="chip">${note}</span>`);
   settle();
 }
 
 async function load() {
   cfg = await api("/api/config");
+  $("compose").classList.toggle("hidden", !(cfg.music && cfg.musicLive));
   const s = await api(`/api/room/${venue}`);
   venueName = s.venue;
   document.title = `${s.venue}, ${PRODUCT}`;
@@ -229,6 +278,7 @@ if (!film && !embed) {
 if (film || embed) $("start-overlay").classList.add("hidden");
 $("start-room").onclick = () => {
   started = true;
+  ensureGraph();
   $("start-overlay").classList.add("hidden");
   if (current) crossfade(current.audio);
 };
@@ -242,6 +292,12 @@ $("sound").onclick = toggleSound;
 $("skip").onclick = () => api(`/api/room/${venue}/skip`, {});
 $("next-hour").onclick = () => api("/api/clock/next", {});
 $("read-other").onclick = () => api(`/api/room/${venue}/read-other`, {}).catch(() => {});
+$("simulate").onclick = () => api("/api/stage/simulate", { venueId: venue }).then((r) => feed(`Simulated guests: ${r.guests} tapped ${genreName(r.genre).toLowerCase()}`)).catch(() => {});
+$("compose").onclick = async () => {
+  $("compose").disabled = true;
+  try { await api(`/api/room/${venue}/generate`, {}); } catch { /* the fallback event explains */ }
+  $("compose").disabled = false;
+};
 document.addEventListener("keydown", (e) => {
   if (film || embed || e.target.closest?.("input, select, textarea")) return;
   if (e.key === "n" || e.key === "N") $("skip").click();
@@ -267,8 +323,15 @@ events({
     if (mine(e)) { $("refusals").innerHTML = refusalTicket(e) + [...$("refusals").children].slice(0, 1).map((x) => x.outerHTML).join(""); }
     settle();
   },
-  making: (e) => { if (e.venueId === venue) showMaking(e); },
-  music_gen: (e) => { if (e.venueId === venue) showMaking({ ...e, phase: e.phase || (e.fallback ? "fallback" : "done") }); },
+  music_making: (e) => { if (e.venueId === venue) startMaking(e); },
+  music_gen: (e) => {
+    if (e.venueId !== venue) return;
+    const d = e.descriptors || {};
+    feed(`ElevenLabs Music made ${(d.genres || []).map(genreName).join(" and ")}${d.bpm ? `, ${d.bpm} BPM` : ""}`);
+    $("making-for").textContent = `Made in ${Math.round((e.ms || 0) / 100) / 10} seconds. It plays next.`;
+    settle();
+  },
+  music_fallback: (e) => { if (e.venueId === venue) endMaking("Playing the closest track we have"); },
   forgotten: (e) => { showReceipt(e); refreshMemory(); },
   reset: () => load(),
 });

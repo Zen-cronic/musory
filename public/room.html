@@ -16,10 +16,12 @@
   .here span:last-child { font-weight: 700; }
   .main { display: grid; grid-template-columns: 1fr 340px; gap: 14px; min-height: 0; }
   .left { display: grid; grid-template-rows: 1fr auto; gap: 14px; min-height: 0; }
-  .now { padding: 22px 26px; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; position: relative; overflow: hidden; min-height: 300px; }
+  .now { padding: 58px 26px 22px; display: flex; flex-direction: column; gap: 12px; justify-content: flex-end; position: relative; overflow: hidden; min-height: 300px; }
   .now .live { position: absolute; top: 22px; left: 26px; display: flex; align-items: center; gap: 10px; }
   .now .live::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--band); }
   .now .title { font-size: calc(clamp(56px, 8.4vw, 118px) * var(--dscale)); overflow-wrap: anywhere; }
+  .now .title.long { font-size: calc(clamp(44px, 6vw, 84px) * var(--dscale)); }
+  .now .desc#now-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .now .meta { display: flex; gap: 8px; flex-wrap: wrap; }
   .now .desc { color: var(--slab-muted); font-size: 17px; font-weight: 500; max-width: 52ch; }
   .next { padding: 16px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -57,7 +59,7 @@
   .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .controls .btn { min-height: 38px; font-size: 14px; padding: 0 14px; text-decoration: none; }
   .receipt { position: fixed; inset: 0; z-index: 30; display: grid; align-content: center; gap: 22px; padding: 6vh 7vw; }
-  .receipt h2 { font-size: calc(72px * var(--dscale)); max-width: 20ch; }
+  .receipt h2 { font-size: calc(72px * var(--dscale)); max-width: 24ch; }
   .receipt .figure { font-size: 180px; }
   .receipt .sub { font-size: 24px; font-weight: 800; margin-top: -8px; }
   .receipt .lines { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 1100px; }
@@ -77,11 +79,12 @@
   .making-for { font-weight: 700; font-size: 22px; }
   .handover { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 18px; }
   .handover .caption { color: var(--slab-muted); }
-  .next:has(#without-memory[hidden]) #with-memory { grid-column: 1 / -1; }
+  .next:has(#without-memory-row.hidden) #with-memory { grid-column: 1 / -1; }
+  #without-memory-row > .pick { height: 100%; }
   @media (prefers-reduced-motion: reduce) { .meter i { animation: none; } }
 </style>
 </head>
-<body>
+<body class="room-page">
 <div id="start-overlay" class="start-overlay"><button id="start-room" class="btn forget" style="font-size:28px;min-height:76px;padding:0 40px">Start the room</button></div>
 
 <div class="room">
@@ -102,7 +105,8 @@
         <div class="meta" id="now-meta"></div>
         <p class="desc" id="now-desc"></p>
         <p class="desc" id="now-why" hidden></p>
-        <div class="making-block" aria-live="polite">
+        <span id="now-provenance" hidden></span>
+        <div class="making-block" id="making" aria-live="polite">
           <div class="meter" aria-hidden="true"><i style="--h:40%;--d:0.9s"></i><i style="--h:72%;--d:0.7s"></i><i style="--h:55%;--d:1.1s"></i><i style="--h:88%;--d:0.8s"></i><i style="--h:62%;--d:1s"></i><i style="--h:95%;--d:0.75s"></i><i style="--h:48%;--d:0.95s"></i><i style="--h:80%;--d:0.85s"></i><i style="--h:66%;--d:1.05s"></i><i style="--h:92%;--d:0.7s"></i><i style="--h:58%;--d:0.9s"></i><i style="--h:76%;--d:1s"></i><i style="--h:44%;--d:0.8s"></i><i style="--h:86%;--d:0.95s"></i><i style="--h:70%;--d:0.75s"></i><i style="--h:98%;--d:0.85s"></i><i style="--h:52%;--d:1.1s"></i><i style="--h:82%;--d:0.8s"></i><i style="--h:64%;--d:0.9s"></i><i style="--h:90%;--d:1s"></i><i style="--h:46%;--d:0.85s"></i><i style="--h:74%;--d:0.7s"></i><i style="--h:60%;--d:1.05s"></i><i style="--h:84%;--d:0.9s"></i></div>
           <div class="display making-title">Making a new track</div>
           <p class="making-for" id="making-for"></p>
@@ -116,10 +120,12 @@
           <div id="next-title" class="display t" data-track-id="">…</div>
           <div class="g" id="with-genre"></div>
         </div>
-        <div class="pick" id="without-memory" data-testid="without-memory" data-track-id="">
-          <span class="kicker">Without memory</span>
-          <div class="display t" id="without-title">…</div>
-          <div class="g" id="without-genre"></div>
+        <div id="without-memory-row">
+          <div class="pick" id="without-memory" data-testid="without-memory" data-track-id="">
+            <span class="kicker">Without memory</span>
+            <div class="display t" id="without-title">…</div>
+            <div class="g" id="without-genre"></div>
+          </div>
         </div>
         <p class="why" id="next-why" data-testid="why"></p>
         <div id="candidates" hidden></div>
@@ -154,6 +160,8 @@
   <div class="controls">
     <button id="skip" class="btn">Play next now</button>
     <button id="next-hour" class="btn">Next hour</button>
+    <button id="simulate" class="btn">Simulated guests: 5 tap a new sound</button>
+    <button id="compose" class="btn hidden">Make the next track now</button>
     <button id="sound" class="btn">Sound: on</button>
     <button id="read-other" class="btn">Try reading the other venue's crowd memory</button>
     <a class="btn" id="link-stage" href="/stage">Stage screen</a>

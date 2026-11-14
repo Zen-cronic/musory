@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Musory on stage</title>
+<script src="/js/look-early.js"></script>
+<link rel="stylesheet" href="/css/musory.css">
+<style>
+  body { height: 100vh; overflow: hidden; }
+  .stage { height: 100vh; display: grid; grid-template-columns: 46vh 1fr; grid-template-rows: 1fr auto; gap: 3.4vh 4vh; padding: 5vh 5vh 0; }
+  .qr { padding: 3vh; display: grid; gap: 2vh; align-content: start; }
+  .qr img { width: 100%; aspect-ratio: 1; background: #fff; display: block; }
+  .qr p { font-family: var(--f-display); font-weight: 900; font-stretch: var(--stretch); text-transform: var(--case); font-size: 5vh; line-height: .95; }
+  .right { display: grid; grid-template-rows: auto 1fr auto; gap: 3vh; min-width: 0; }
+  .right .top { display: flex; align-items: center; justify-content: space-between; gap: 2vh; }
+  .count { display: flex; flex-direction: column; justify-content: center; }
+  .count .n { font-size: 32vh; }
+  .count .l { font-family: var(--f-display); font-weight: 900; font-stretch: var(--stretch); text-transform: var(--case); font-size: 6.4vh; line-height: .95; }
+  .now { padding: 2.6vh 3vh; display: grid; gap: 1vh; }
+  .now .t { font-size: 8vh; }
+  .now .g { color: var(--slab-muted); font-weight: 600; font-size: 2.8vh; }
+  .ticker { grid-column: 1 / -1; overflow: hidden; white-space: nowrap; border-top: 3px solid var(--band); padding: 1.6vh 0 2vh; font-family: var(--f-display); font-weight: 900; font-stretch: var(--stretch); text-transform: var(--case); font-size: 4vh; color: var(--on-bg); }
+  .ticker span { display: inline-block; padding-left: 100%; animation: ticker 28s linear infinite; }
+  .ticker b { color: var(--band); }
+  @keyframes ticker { to { transform: translateX(-100%); } }
+  @media (prefers-reduced-motion: reduce) { .ticker span { animation: none; padding-left: 0; } }
+  .receipt { position: fixed; inset: 0; z-index: 30; display: grid; align-content: center; gap: 3vh; padding: 6vh 7vh; }
+  .receipt h1 { font-size: 12vh; max-width: 16ch; }
+  .receipt .figure { font-size: 30vh; justify-self: start; }
+  .receipt p { font-weight: 800; font-size: 4.4vh; max-width: 30ch; line-height: 1.15; }
+  .sim { position: fixed; right: 2vh; bottom: 2vh; z-index: 20; }
+  .sim .btn { min-height: 36px; font-size: 14px; padding: 0 14px; background: var(--surface); color: var(--text); }
+</style>
+</head>
+<body>
+<main class="stage">
+  <section class="surface qr">
+    <img id="qr" alt="QR code to check in">
+    <p id="qr-text">Scan to check in</p>
+  </section>
+  <section class="right">
+    <div class="top"><span class="wordmark lg">Musory</span><h2 class="display" id="venue-name" style="font-size:5vh"></h2></div>
+    <div class="count"><span class="figure n" id="present" data-testid="stage-count">0</span><span class="l">people shaping the music</span></div>
+    <div class="slab now" data-testid="now-playing" id="now-playing" data-track-id=""><span class="kicker">Now playing</span><span class="display t" id="now-title"></span><span class="g" id="now-meta"></span></div>
+  </section>
+  <div class="ticker" aria-hidden="true"><span id="ticker"></span></div>
+</main>
+<section class="flood receipt hidden" id="receipt" data-testid="stage-receipt"></section>
+<div class="sim controls"><button id="simulate" class="btn">Simulated guests</button></div>
+<script type="module">
+import { api, events, $, genreName } from "/js/common.js";
+import { params, busy, settle, film } from "/js/look.js";
+const venue = params.get("venue") || location.pathname.split("/")[2] || "copper";
+const RING = `<svg class="mark ring wide draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M34 5 C 90 1, 160 1, 208 7 C 217 32, 217 78, 209 103 C 150 109, 70 109, 11 103 C 3 78, 3 32, 12 8 C 30 4, 52 3, 70 4"/></svg>`;
+let name = venue, now = null, next = null;
+function ticker() {
+  $("ticker").innerHTML = [now && `Now playing <b>${now.title}</b>`, next && `Next <b>${next.title}</b>`, `Say forget me and every room forgets you`, `Scan to check in at ${name}`].filter(Boolean).join("&emsp;&emsp;");
+}
+function showPlay(p) {
+  if (!p) return;
+  now = p;
+  $("now-title").textContent = p.title;
+  $("now-playing").dataset.trackId = p.trackId;
+  $("now-meta").textContent = `${genreName(p.genre)}, ${p.bpm} BPM${p.composed ? ". Made just now for this room" : ""}`;
+  ticker(); settle();
+}
+async function load() {
+  const s = await api(`/api/room/${venue}`);
+  name = s.venue;
+  $("venue-name").textContent = s.venue;
+  $("qr").src = `/api/qr?venue=${venue}`;
+  $("qr-text").textContent = `Scan to check in at ${s.venue}`;
+  $("present").textContent = s.present;
+  next = s.next?.picked || null;
+  showPlay(s.play);
+}
+$("simulate").onclick = () => api("/api/stage/simulate", { venueId: venue }).catch(() => {});
+events({
+  play: (e) => { if (e.venueId === venue) showPlay(e.play); },
+  next: (e) => { if (e.venueId === venue) { next = e.decision?.picked || null; ticker(); settle(); } },
+  presence: (e) => { if (e.venueId === venue) { $("present").textContent = e.count; settle(); } },
+  forgotten: (r) => {
+    const el = $("receipt");
+    el.innerHTML = `<h1 class="display">${r.label} said forget me</h1><div class="figure marked" data-testid="receipt-count">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div><p>records about them, deleted in one step across both venues.</p>`;
+    el.classList.remove("hidden");
+    busy(true);
+    setTimeout(() => { busy(false); settle(); }, 800);
+    setTimeout(() => el.classList.add("hidden"), 12000);
+  },
+  reset: () => load(),
+});
+load();
+void film;
+</script>
+</body>
+</html>

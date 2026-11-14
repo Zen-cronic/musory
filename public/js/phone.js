@@ -120,7 +120,7 @@ async function doForget() {
   $("volunteer").classList.add("hidden");
   $("consent").classList.add("hidden");
   const el = $("receipt");
-  const RING = `<svg class="mark ring wide draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M200 34 C 214 74, 160 106, 104 106 C 44 106, 4 86, 5 54 C 6 22, 56 3, 114 3 C 170 3, 214 16, 210 44"/></svg>`;
+  const RING = `<svg class="mark ring wide draw" viewBox="0 0 220 110" preserveAspectRatio="none" aria-hidden="true"><path d="M34 5 C 90 1, 160 1, 208 7 C 217 32, 217 78, 209 103 C 150 109, 70 109, 11 103 C 3 78, 3 32, 12 8 C 30 4, 52 3, 70 4"/></svg>`;
   el.innerHTML = `<span class="wordmark">Musory</span>
     <h1 class="display">You're forgotten</h1>
     <div class="figure marked" id="receipt-count" data-testid="receipt-count">${r.totalBefore}<span class="count-arrow"></span>${r.totalAfter}${RING}</div>
