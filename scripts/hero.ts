@@ -27,7 +27,7 @@ const ac = new AbortController();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 await post("/api/film/reset", {});
 await post("/api/checkin", { personId: "g-jess", venueId: "copper" });
-await sleep(4000);
+await sleep(Number(process.env.HERO_GAP_MS || 9000));
 const t0 = Date.now();
 const sim = await post("/api/stage/simulate", { venueId: "copper" });
 console.log("simulated:", JSON.stringify(sim));

@@ -15,6 +15,7 @@ Your taps feed every room's crowd memory, which you never wrote. Forget me remov
 - **Your taste is yours.** It goes with you to any venue you check into, so there's no cold start, and a venue uses it only while you're there.
 - **Each venue's crowd memory is private.** Copper Room can't read Basement 2's, and neither can read your raw taps. Atlas refuses (error 13).
 - **Forget me** deletes your taste, your taps, your check-ins, and your share of every venue's crowd memory, in one transaction. The receipt shows the count going to 0, and both rooms re-pick and play the track they said they'd play without you.
+- **The room makes a new track when the crowd moves it.** When guests' taps change a room's leading sound, the room asks ElevenLabs Music for a new 15-second track at its current tempo (a composition plan that eases from the current sound into the new one) and crossfades into it over about 3 seconds, with filter sweeps. The screen says "Making a new track for the N people…", then "Made just now for this room". If the new track takes more than 10 seconds, the room plays the closest track from its catalogue and says so.
 
 Venues (Copper Room, Basement 2), guests and track titles are fictional. The music is 19 instrumental clips we generated with ElevenLabs Music from descriptions of genre, tempo and sound only.
 
@@ -60,7 +61,7 @@ Crowd memory holds no identities, so how does forget me find your share? Each cr
 | Atlas schema validation (`constraint`), unique and TTL indexes | The 121 and E11000 refusals; expiry of taps, check-ins and tonight sessions |
 | Atlas database users + Views | One login per venue; the 13 refusals |
 | Voyage AI (`voyage-4`) | Embeds each clip's text description (genre, tempo, energy, sound) |
-| ElevenLabs Music (`music_v2`) | Generated the 19 instrumental clips the rooms play, from descriptor-only prompts |
+| ElevenLabs Music | Generated the 19-clip catalogue (`music_v2`), and composes new tracks live (`music_v2_5`, composition plan) when the crowd's taps move a room to a new sound |
 
 ## Run it
 
@@ -76,14 +77,16 @@ pnpm smoke                # end-to-end checks against the running server
 - **Start here:** `http://localhost:4377/` lists the steps. Rooms: `/room/copper`, `/room/basement`. Guest page: `/join/copper`. Proofs: `/proof`.
 - **Phones on the same Wi-Fi:** `pnpm lan` serves on the laptop's LAN address and puts it in the QR codes. Some guest Wi-Fi blocks phone-to-laptop traffic; then open `/p/<guest>` tabs on the laptop.
 - **Database users** are created in Atlas (UI, CLI or Admin API), not by the driver: the app user with `readWrite` and `dbAdmin` on `edmRoom`, and one user per venue with `read` on that venue's View only.
-- **Reset:** `POST /api/reset` (regulars from last weekend), or `POST /api/film/reset` (adds Jess, a guest with techno taste who hasn't checked in yet).
+- **Reset:** `POST /api/reset` (regulars from last weekend), or `POST /api/film/reset` (adds Jess, a guest with techno taste who hasn't checked in yet, and four quiet guests in Copper Room).
+- **Live music:** start with `MUSIC_LIVE=1 pnpm start`. Without it, rooms play the catalogue only.
+- **Room controls** (reset, skip, simulated guests, proofs) work only from the laptop itself; through a tunnel or from another device they return 403.
 
 ## What's simulated and what isn't
 
 - **Real:** every database rule, refusal, transaction, change stream and vector search above runs live on Atlas. The clips are real ElevenLabs Music generations. The embeddings are real Voyage calls (cached on disk so a reset doesn't spend the rate limit).
-- **Simulated:** the venues, their regulars from "last weekend" and the guests are seeded. The time of night is a demo clock ("Next hour"). Clips are 15 seconds, so a room's set moves fast. "Tonight only" lasts 2 minutes in the demo.
-- **Not built:** real venue sound systems or DJ software; the room plays clips in a browser. Transitions are a 1-second crossfade, not beat-matched mixing.
-- **Limits we know about:** Atlas backups and the oplog keep data for their own retention windows; the validator checks what the server writes onto a document (it trusts the copied owner ids). TTL expiry runs about once a minute, not instantly. A pick reveals a little about who is in the room. The ElevenLabs clips were generated once and stored here; nothing about a guest is sent to ElevenLabs.
+- **Simulated:** the venues, their regulars from "last weekend" and the guests are seeded. A **Simulated guests** button makes five seeded guests like two samples of one sound, so the room can be tried without phones; it is labelled as simulated on screen. The time of night is a demo clock ("Next hour"). Clips are 15 seconds, so a room's set moves fast. "Tonight only" lasts 2 minutes in the demo.
+- **Not built:** real venue sound systems or DJ software; the room plays clips in a browser. Transitions are crossfades (1 second between catalogue tracks, about 3 seconds with filter sweeps into a new track), not beat-matched mixing.
+- **Limits we know about:** Atlas backups and the oplog keep data for their own retention windows; the validator checks what the server writes onto a document (it trusts the copied owner ids). TTL expiry runs about once a minute, not instantly. A pick reveals a little about who is in the room. Live composition sends ElevenLabs only genre, tempo and texture words from the room's blend, never anything about a guest. A composed track's record keeps the room's mix, the number of people behind it (3 or more) and the tap ids it was built from, so forget me deletes it and its file; copies ElevenLabs keeps under its own terms are outside this app's reach. Live composition is capped at 60 tracks a day and one per room every 20 seconds.
 
 ## Prior art
 

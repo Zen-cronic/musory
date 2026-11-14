@@ -10,13 +10,14 @@ import { subscribe, emit, recentEvents, clientCount } from "./events.js";
 import {
   HttpError, fail, loadTracks, startPlayer, resetAndSeed, roomState, me, personOf, checkin, checkout, tap, bored, undoBored,
   startTonight, endTonight, keepTonightTap, forget, proof, headline, nextHour, clockState, advance, playView, rooms, guestLabel,
-  emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset, guestTag, STAGE, simulateGuests,
+  emitPresence, scheduleRefresh, crossVenueRead, withoutYou, filmReset, guestTag, STAGE, simulateGuests, dropQueuedClip,
 } from "./room.js";
 import { generateFromRoom, hasMusicKey, liveMusicOn, musicState } from "./music.js";
 import { forgetGraphOn, runForgetGraph, resumePending } from "./forget-graph.js";
 import { findOn, findTrack } from "./find.js";
 import { latestEvals } from "./evals.js";
 import { byId } from "./catalog.js";
+import { removeClipAudio } from "./expiry.js";
 
 // "Start your taste": one short sample per sound, so a new guest can say what they like in one tap.
 const SAMPLES = ["t13", "t10", "t17", "t15", "t08", "t05"];
@@ -92,8 +93,8 @@ app.get("/me", page("phone.html"));
 app.get("/join", page("phone.html"));
 app.get("/p/:guest", page("phone.html"));
 app.get("/proof", page("proof.html"));
-// Pages the visual layer adds (stage mode, how it works, look comparison): 404 until the file exists.
-for (const name of ["stage", "how", "compare"])
+// Pages the visual layer adds (stage mode, how it works): 404 until the file exists.
+for (const name of ["stage", "how"])
   app.get(`/${name}`, (_req, res) => {
     const file = path.join(root, "public", `${name}.html`);
     if (existsSync(file)) res.sendFile(file);
@@ -211,6 +212,11 @@ async function watch() {
         if (coll === DERIVED && doc?.kind === "decision" && c.operationType === "insert") {
           const { derivedFrom, ...rest } = doc;
           emit("next", { venueId: doc.venueId, decision: rest });
+        }
+        // A composed clip expired (TTL) or was forgotten: remove its audio file and drop it from any queue.
+        if (coll === DERIVED && c.operationType === "delete") {
+          removeClipAudio(c.documentKey?._id);
+          dropQueuedClip(String((c.documentKey?._id as { toHexString?: () => string })?.toHexString?.() ?? ""));
         }
         if (coll === DERIVED && doc?.kind === "crowd")
           emit("crowd", { venueId: doc.venueId, contributors: doc.distinctContributors, weights: doc.weights });

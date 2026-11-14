@@ -10,16 +10,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ObjectId, type Document } from "mongodb";
 import { db, DERIVED, VENUES, type VenueId } from "./db.js";
-import { fail, rooms, queueClip, advance, setDecisionHook, setComposingCheck, currentGenre } from "./room.js";
+import { fail, rooms, queueClip, advance, setDecisionHook, setComposingCheck, currentGenre, composeSoon } from "./room.js";
 import { TRACKS, byId } from "./catalog.js";
 import { emit } from "./events.js";
+import { closingAfter } from "./expiry.js";
 
 export const hasMusicKey = () => Boolean(process.env.ELEVENLABS_API_KEY);
 export const liveMusicOn = () => process.env.MUSIC_LIVE === "1" || process.env.LIVE_MUSIC === "1";
 export const MUSIC_MODEL = "music_v2_5";
 const CLIP_MS = 15_000;
 const FALLBACK_MS = Number(process.env.MUSIC_FALLBACK_MS || 10_000); // after this, play the closest catalogue track
-const MIN_GAP_MS = Number(process.env.MUSIC_GAP_MS || 20_000); // at most one composition per room every 20 s
+// At most one composition per room every 20 s for guests' taps; 8 s in stage mode and after simulated guests.
+const MIN_GAP_MS = Number(process.env.MUSIC_GAP_MS || (process.env.STAGE === "1" ? 8_000 : 20_000));
+const SOON_GAP_MS = Number(process.env.MUSIC_SOON_GAP_MS || 8_000);
 const MAX_PER_DAY = Number(process.env.LIVE_MUSIC_MAX || 60);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const GEN_DIR = path.join(root, "public", "audio", "gen");
@@ -146,6 +149,7 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
       audio: `/audio/gen/${id.toHexString()}.mp3`,
       ms,
       at: new Date(),
+      expiresAt: closingAfter(),
       derivedFrom,
     };
     const d = await db();
@@ -180,10 +184,12 @@ setComposingCheck((v) => busy.has(v));
 // right away, in parallel with the current clip.
 setDecisionHook((venueId, decision) => {
   if (!liveMusicOn() || !hasMusicKey() || busy.has(venueId)) return;
-  if (Date.now() - (lastStart[venueId] ?? 0) < MIN_GAP_MS) return;
+  const soon = composeSoon.has(venueId);
+  if (Date.now() - (lastStart[venueId] ?? 0) < (soon ? SOON_GAP_MS : MIN_GAP_MS)) return;
   const leading = leadingOf(decision.mix as Record<string, number>);
   if (!leading || leading === currentGenre(venueId) || leading === lastLeading[venueId]) return;
   const people = ((decision.sharingCount as number) ?? 0) + ((decision.crowdContributors as number) ?? 0);
   if (!(decision.sharingCount as number) || people < 3) return;
+  composeSoon.delete(venueId);
   void generateFromRoom(venueId, { reason: "the crowd's taps moved the room" }).catch((e) => console.error("compose failed", (e as Error).message));
 });

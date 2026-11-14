@@ -4,6 +4,7 @@
 import { db, closeAll, redactError, TRACKS as TRACKS_COLL, TAPS, DERIVED, CONSENTS, PRESENCE, SESSIONS, PREFS, PLAYS, TOMBSTONES, VENUES, VENUE_IDS } from "../server/db.js";
 import { TRACKS, embedText } from "../server/catalog.js";
 import { embedSeed } from "../server/embed.js";
+import { ensureClipExpiry } from "../server/expiry.js";
 
 const DAY = 86_400_000;
 const missing = (f: string) => ({ $eq: [{ $type: f }, "missing"] });
@@ -135,6 +136,7 @@ async function main() {
   await d.collection(DERIVED).createIndex({ derivedFrom: 1 });
   await d.collection(DERIVED).createIndex({ kind: 1, venueId: 1, at: -1 });
   await d.collection(DERIVED).createIndex({ kind: 1, ownerId: 1 });
+  await ensureClipExpiry(d); // composed clips expire after closing (TTL)
   await d.collection(CONSENTS).createIndex({ personId: 1, venueId: 1 }, { unique: true });
   await d.collection(CONSENTS).createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
   // One room at a time: a guest's presence is one document.

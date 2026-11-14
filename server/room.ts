@@ -478,6 +478,8 @@ export function queueClip(venueId: VenueId, meta: ClipMeta) {
   genClips.set(m.trackId, m);
   rooms[venueId].queued = m;
 }
+// Venues whose next pick follows a simulated-guests run: live music may compose sooner for them.
+export const composeSoon = new Set<VenueId>();
 // Live music registers here: it hears every new pick, and tells the room when a track is being made.
 let decisionHook: ((venueId: VenueId, decision: Document) => void) | null = null;
 export const setDecisionHook = (fn: (venueId: VenueId, decision: Document) => void) => (decisionHook = fn);
@@ -488,6 +490,12 @@ export const currentGenre = (venueId: VenueId) => {
   const id = rooms[venueId].play?.trackId ?? "";
   return genClips.get(id)?.genre.split(" + ")[0] ?? byId.get(id)?.genre ?? "house";
 };
+/** A composed clip's record is gone (expired or forgotten): it must not play. */
+export function dropQueuedClip(clipId: string) {
+  if (!clipId) return;
+  for (const [k, m] of genClips) if (m.clipId === clipId) genClips.delete(k);
+  for (const v of VENUE_IDS) if (rooms[v].queued?.clipId === clipId) rooms[v].queued = undefined;
+}
 /** The catalogue track behind what a room is playing (a composed clip maps to the track it was built around). */
 const catalogueId = (trackId: string) => (byId.has(trackId) ? trackId : genClips.get(trackId)?.anchorTrackId ?? "t01");
 
@@ -1249,8 +1257,7 @@ export async function simulateGuests(venueId: VenueId, genre?: string) {
   const d = await db();
   const ids = [1, 2, 3, 4, 5].map((i) => `sim-${i}`);
   // Each simulated guest starts fresh for this sound: earlier simulated taps are cleared first.
-  await d.collection(TAPS).deleteMany({ personId: { $in: ids } });
-  for (const id of ids) await checkinQuiet(id, venueId);
+  await Promise.all([d.collection(TAPS).deleteMany({ personId: { $in: ids } }), ...ids.map((id) => checkinQuiet(id, venueId))]);
   const consents = await d.collection(CONSENTS).find({ personId: { $in: ids }, venueId }).toArray();
   const now = Date.now();
   const docs = ids.flatMap((id, i) =>
@@ -1261,8 +1268,9 @@ export async function simulateGuests(venueId: VenueId, genre?: string) {
     })),
   );
   await d.collection(TAPS).insertMany(docs);
-  await rebuildTastesBatch(ids);
   emit("simulated", { venueId, guests: ids.length, genre: target, samples });
-  void afterAction(venueId).catch(() => {});
+  composeSoon.add(venueId);
+  ids.forEach((id) => dirtyTastes.add(id)); // rebuilt in the room's next refresh, in one batch
+  void refreshNow(venueId).then(() => afterAction(venueId)).catch(() => {});
   return { venueId, guests: ids.length, genre: target, taps: docs.length };
 }
