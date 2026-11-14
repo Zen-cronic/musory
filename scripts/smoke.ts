@@ -73,10 +73,23 @@ r = await room("basement");
 check("taste applies at Pulse Club immediately", r.next?.sharingCount >= 1 && r.next?.parts?.taste > 0, `sharing ${r.next?.sharingCount}, pick ${before?.picked?.title} -> ${r.next?.picked?.title}`);
 
 // "Tell the room what you want": a few words become one like on the closest track.
-if ((await api("/api/config")).vibe) {
+let vibeClipUrl: string | undefined;
+const cfg0 = await api("/api/config");
+if (cfg0.vibe) {
   await sleep(1100);
+  const from = streamed.length;
+  const tv = Date.now();
   const v = await api("/api/vibe", { personId: guest, text: "something dark and driving" });
   check("tell the room what you want: words become a like on the closest track", v.status === 200 && Boolean(v.vibe?.trackId), `${v.vibe?.title} (${v.vibe?.genre})`);
+  if (cfg0.musicLive && v.making) {
+    let made: any = null;
+    for (let i = 0; i < 40 && !made; i++) {
+      await sleep(250);
+      made = streamed.slice(from).find((e) => e.type === "play" && e.data.venueId === "basement" && e.data.play?.composed);
+    }
+    vibeClipUrl = made?.data.play.audio;
+    check("the room makes and plays a track for what the guest asked for", Boolean(made), made ? `${((Date.now() - tv) / 1000).toFixed(1)} s from the words to the new track` : "no track");
+  }
 }
 
 // 3. Bored of this: likes superseded, then undo.
@@ -114,6 +127,11 @@ check("a guest id in venue memory is refused (121)", ident.ok === false && ident
 // 6. Forget me: N -> 0, every venue's crowd memory rebuilt, the room plays the pick without them.
 const w = await api(`/api/without?personId=${guest}`);
 const f = await api("/api/forget", { personId: guest });
+if (vibeClipUrl) {
+  check("forget me counts the track made for the guest's words", (f.before?.composedClips ?? 0) >= 1, `composedClips ${f.before?.composedClips}`);
+  const gone = await fetch(BASE + vibeClipUrl);
+  check("that track's sound is gone after forget me (404)", gone.status === 404);
+}
 check("forget me removes every record (N -> 0)", f.totalBefore > 0 && f.totalAfter === 0, `${f.totalBefore} -> ${f.totalAfter}, txn ${f.txnMs} ms`);
 check("forget me removed the guest's share from both venues' crowd memory", (f.venues ?? []).filter((v: any) => v.contributionRemoved).length === 2);
 await sleep(500);

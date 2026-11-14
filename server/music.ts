@@ -40,15 +40,16 @@ function stylesFor(genre: string): string[] {
 const leadingOf = (mix: Record<string, number> = {}) => Object.entries(mix).sort((a, b) => b[1] - a[1])[0]?.[0];
 
 /** Two sections at the room's current tempo: a short lead-in from the current sound, then the crowd's new sound. */
-export function planFor(fromGenre: string, toGenres: string[], bpm: number) {
+export function planFor(fromGenre: string, toGenres: string[], bpm: number, leadStyles?: string[]) {
   const to = toGenres[0] ?? "house";
   const second = toGenres[1];
+  const main = leadStyles?.length ? [to, ...leadStyles] : stylesFor(to);
   const chunks = [
     { text: "[Lead-in]", duration_ms: 4000, positive_styles: [...stylesFor(fromGenre).slice(0, 3), to, `${bpm} BPM`], negative_styles: ["vocals", "spoken word"] },
     {
       text: "[New groove]",
       duration_ms: CLIP_MS - 4000,
-      positive_styles: [...stylesFor(to), ...(second ? [`hints of ${second}`] : []), `${bpm} BPM`],
+      positive_styles: [...main, ...(second ? [`hints of ${second}`] : []), `${bpm} BPM`],
       negative_styles: ["vocals", "spoken word"],
     },
   ];
@@ -110,9 +111,15 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
   lastStart[venueId] = Date.now();
   const t0 = Date.now();
   const fromGenre = currentGenre(venueId);
-  const bpm = byId.get(rooms[venueId].play?.trackId ?? "")?.bpm ?? (decision.picked?.bpm as number) ?? 124;
-  const genres = Object.entries((decision.mix ?? {}) as Record<string, number>).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g]) => g);
-  const { descriptors, plan } = planFor(fromGenre, genres, bpm);
+  // A guest who told the room what they want: the track their words matched leads the new track
+  // (its genre, tempo and descriptor words; never the guest's own words).
+  const lean = leanTo.get(venueId) ? byId.get(leanTo.get(venueId)!) : undefined;
+  leanTo.delete(venueId);
+  const bpm = lean?.bpm ?? byId.get(rooms[venueId].play?.trackId ?? "")?.bpm ?? (decision.picked?.bpm as number) ?? 124;
+  let genres = Object.entries((decision.mix ?? {}) as Record<string, number>).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g]) => g);
+  if (lean) genres = [lean.genre, ...genres.filter((g) => g !== lean.genre)].slice(0, 2);
+  const leadStyles = lean ? lean.descriptor.split(",").map((w) => w.trim()).filter((w) => !/BPM/i.test(w)).slice(1, 5).concat("instrumental") : undefined;
+  const { descriptors, plan } = planFor(fromGenre, genres, bpm, leadStyles);
   lastLeading[venueId] = genres[0];
   emit("music_making", {
     venueId, people, genres, bpm, from: fromGenre, reason: opts.reason ?? "manual",
@@ -192,6 +199,15 @@ async function composeFor(venueId: VenueId, opts: { reason?: string }) {
 }
 
 setComposingCheck((v) => busy.has(v));
+
+// "Tell the room what you want": the next pick in that room composes a track led by the matched catalogue track.
+const leanTo = new Map<VenueId, string>();
+export function composeToward(venueId: VenueId, trackId: string) {
+  if (!liveMusicOn() || !hasMusicKey()) return false;
+  leanTo.set(venueId, trackId);
+  composeSoon.add(venueId);
+  return true;
+}
 
 // The trigger: a new pick whose leading sound differs from what the room is playing starts a composition
 // right away, in parallel with the current clip.

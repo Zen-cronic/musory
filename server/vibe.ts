@@ -8,6 +8,8 @@
 import { db, TRACKS } from "./db.js";
 import { HttpError, tap } from "./room.js";
 import { embedQuery } from "./find.js";
+import { composeToward } from "./music.js";
+import { isVenue } from "./db.js";
 
 export const vibeOn = () => process.env.VIBE_TAP === "1";
 
@@ -27,10 +29,19 @@ export async function vibeTap(personId: string, textArg: unknown) {
     .toArray();
   if (!hit) throw new HttpError(404, "No track is close to that.");
   // The rest is the button-press path: consent and presence checks, scope, expiry, validators, re-pick.
+  // With live music on, that re-pick composes a new track led by the matched track (descriptors only).
+  const d2 = await db();
+  const pres = await d2.collection("presence").findOne({ personId });
+  const making = pres && isVenue(pres.venueId) ? composeToward(pres.venueId, String(hit._id)) : false;
   const result = (await tap(personId, 1, String(hit._id))) as Record<string, unknown>;
   return {
     ...result,
     vibe: { trackId: String(hit._id), title: hit.title, genre: hit.genre, bpm: hit.bpm, score: Math.round(hit.score * 1000) / 1000 },
-    message: result.already ? result.message : `Counted as a like for ${hit.title} (${hit.genre}, ${hit.bpm} BPM).`,
+    making: Boolean(making && !result.already),
+    message: result.already
+      ? result.message
+      : making
+        ? `The room is making a track for that: ${hit.genre}, ${hit.bpm} BPM.`
+        : `Counted as a like for ${hit.title} (${hit.genre}, ${hit.bpm} BPM).`,
   };
 }
